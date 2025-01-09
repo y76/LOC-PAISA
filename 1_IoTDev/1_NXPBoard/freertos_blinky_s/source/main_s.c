@@ -364,6 +364,13 @@ void syncAck(const uint8_t *resp_buffer)
 
 	memcpy(ack_buffer+msg_len, ACK_END_CHAR, strlen(ACK_END_CHAR));
 	msg_len += strlen(ACK_END_CHAR);
+
+	PRINTF("Sending message (length %d): ", msg_len);
+	for(int i = 0; i < msg_len; i++) {
+	    PRINTF("%02X ", ack_buffer[i]);  // Print each byte in hexadecimal
+	}
+	PRINTF("\r\n");
+
 	USART_WriteBlocking(WIFI_USART, ack_buffer, msg_len);
 
 }
@@ -513,6 +520,12 @@ void announcement()
 	memcpy(msg+msg_len, &time_attest, TIME_SIZE);
 	msg_len += TIME_SIZE;
 
+	PRINTF("Sending message (length %d): ", msg_len);
+	for(int i = 0; i < msg_len; i++) {
+	    PRINTF("%02X ", msg[i]);  // Print each byte in hexadecimal
+	}
+	PRINTF("\r\n");
+
 	USART_WriteBlocking(WIFI_USART, msg, msg_len);
 }
 
@@ -601,7 +614,7 @@ int main(void)
 		PRINTF( "Initialization of crypto HW failed\n\r" );
 		while(1);
 	}
-
+	PRINTF ("HELLO WORLD\n\r");
 	/* Init SysTick module */
 	/* call CMSIS SysTick function. It enables the SysTick interrupt at low priority */
 	SysTick_Config(CLOCK_GetCoreSysClkFreq() / CONVERT_MS_TO_S); /* 1 ms period */
@@ -632,15 +645,15 @@ int main(void)
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[0] = DWT->CYCCNT;
 #endif
-	syncReq(req_buffer);
+	//syncReq(req_buffer);
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[1] = DWT->CYCCNT;
 #endif
-	syncResp(req_buffer, resp_buffer);
+//	syncResp(req_buffer, resp_buffer);
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[2] = DWT->CYCCNT;
 #endif
-	syncAck(resp_buffer);
+//	syncAck(resp_buffer);
 
    	/* init CTimer */
    	ctimer_init();

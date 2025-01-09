@@ -8,10 +8,10 @@
     <stringAttribute key="com.crt.ctrlcenter.currentWireType" value="SWD"/>
     <booleanAttribute key="com.crt.ctrlcenter.mainBreakIsHardware" value="true"/>
     <booleanAttribute key="com.crt.ctrlcenter.saveState" value="true"/>
-    <stringAttribute key="com.crt.ctrlcenter.serialNumber" value="LinkServerNXP SemiconductorsLPC-LINK2 CMSIS-DAP V5.224ATAYBQEQ"/>
-    <mapAttribute key="com.crt.ctrlcenter.symbolsGroupSettings">
-        <mapEntry key="${workspace_loc:/freertos_blinky_ns/Debug/freertos_blinky_ns.axf}" value=""/>
-    </mapAttribute>
+    <stringAttribute key="com.crt.ctrlcenter.serialNumber" value="LinkServerNXP SemiconductorsLPC-LINK2 CMSIS-DAP V5.224GTA0BQEQ"/>
+    <listAttribute key="com.crt.ctrlcenter.symbolsAndImagesGroupSettings">
+        <listEntry value="#Thu Jan 09 12:45:25 PST 2025&#10;changeText=false&#10;textAddress=&#10;loadSymbols=true&#10;fileName=${workspace_loc\:/freertos_blinky_ns/Debug/freertos_blinky_ns.axf}&#10;format=elf&#10;loadOffset=&#10;loadImage=false&#10;"/>
+    </listAttribute>
     <intAttribute key="com.crt.ctrlcenter.version" value="6"/>
     <stringAttribute key="com.nxp.mcuxpresso.flash.base.address" value="0x10000000"/>
     <booleanAttribute key="com.nxp.mcuxpresso.flash.clear.console" value="true"/>
