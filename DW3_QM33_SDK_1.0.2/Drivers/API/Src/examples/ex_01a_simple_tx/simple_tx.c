@@ -13,6 +13,13 @@
 #include <nrf_drv_uart.h>
 #include <nrf_gpio.h>
 
+#include "nrf_sdh.h"
+#include "nrf_sdh_ble.h"
+#include "nrf_sdh_soc.h"
+#include "ble_advdata.h"
+#include "app_error.h"
+#include "nrf_log.h"
+
 #if defined(TEST_SIMPLE_TX)
 
 extern void test_run_info(unsigned char *data);

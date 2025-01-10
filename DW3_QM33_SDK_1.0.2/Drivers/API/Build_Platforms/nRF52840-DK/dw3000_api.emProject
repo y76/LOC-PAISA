@@ -59,6 +59,7 @@
       use_compiler_driver="No" />
     <configuration
       Name="Debug"
+      c_user_include_directories="$(NordicSDKDir)/components/ble/common\;;$(NordicSDKDir)/components/softdevice/common\;;$(NordicSDKDir)/components/softdevice/s140/headers\;;$(NordicSDKDir)/components/softdevice/s140/headers/nrf52\;;$(NordicSDKDir)/components/libraries/strerror;$(NordicSDKDir)/components/libraries/atomic;$(NordicSDKDir)/components/softdevice/s140/headers;$(NordicSDKDir)/components/softdevice/s140/headers/nrf52;$(NordicSDKDir)/components/softdevice/common;$(NordicSDKDir)/components/libraries/util;$(NordicSDKDir)/components/ble/common"
       cpp_enable_rtti="Yes"
       debug_register_definition_file="$(NordicSDKDir)/modules/nrfx/mdk/nrf52840.svd" />
     <folder Name="SEGGER">

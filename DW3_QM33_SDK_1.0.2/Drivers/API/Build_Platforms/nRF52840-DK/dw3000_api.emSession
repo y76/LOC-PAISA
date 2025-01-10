@@ -1,7 +1,7 @@
 <!DOCTYPE CrossStudio_Session_File>
 <session>
  <Bookmarks/>
- <Breakpoints groups="Breakpoints;V7M Exceptions" active_group="Breakpoints">
+ <Breakpoints groups="Breakpoints" active_group="Breakpoints">
   <Exceptions set="MemManage;UsageFault_Coprocessor;UsageFault_CheckingError;UsageFault_StateError;BusFault;ExceptionEntryReturnFault;HardFault"/>
  </Breakpoints>
  <ExecutionProfileWindow/>
@@ -23,12 +23,11 @@
  <Project>
   <ProjectSessionItem path="dw3000_api"/>
   <ProjectSessionItem path="dw3000_api;dw3000_api"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;SEGGER"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Setup"/>
   <ProjectSessionItem path="dw3000_api;dw3000_api;Source"/>
   <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples"/>
   <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_01a_simple_tx"/>
-  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;examples_info"/>
-  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;platform"/>
-  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;SDK"/>
   <ProjectSessionItem path="dw3000_api;dw3000_api;System"/>
  </Project>
  <Register1>
@@ -65,9 +64,23 @@
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/shared_data/shared_functions.c" left="0" top="0" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/config_options.c" left="0" top="0" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="22" useTextEdit="1" path="../../Src/example_selection.h" left="0" top="0" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="175" useTextEdit="1" path="../../Src/examples/ex_01a_simple_tx/simple_tx.c" left="0" top="165" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="19" y="136" useTextEdit="1" path="Source/main.c" left="0" selected="1" top="106" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="147" useTextEdit="1" path="Source/main.c" left="0" selected="1" top="128" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="12" y="15" useTextEdit="1" path="../../Src/examples/examples_info/example_info.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="147" useTextEdit="1" path="../../../../../../../Desktop/DW3_QM33_SDK_1.0.2/Drivers/API/Build_Platforms/nRF52840-DK/Source/main.c" left="0" top="105" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="26" y="41" useTextEdit="1" path="sdk/components/ble/common/ble_advdata.h" left="0" top="24" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="17" y="39" useTextEdit="1" path="sdk/components/ble/common/ble_advdata.c" left="0" top="15" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="25" y="23" useTextEdit="1" path="../../Src/examples/ex_01a_simple_tx/simple_tx.c" left="0" top="3" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="43" useTextEdit="1" path="sdk/components/softdevice/s140/headers/nrf52/nrf_mbr.h" left="0" top="17" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="9" y="132" useTextEdit="1" path="sdk/components/libraries/util/app_util.h" left="0" top="110" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="9" y="13" useTextEdit="1" path="Source/platform/deca_probe_interface.h" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="70" useTextEdit="1" path="sdk/integration/nrfx/nrfx_glue.h" left="0" top="48" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="43" useTextEdit="1" path="sdk/modules/nrfx/hal/nrf_gpio.h" left="0" top="36" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="25" y="44" useTextEdit="1" path="Source/platform/deca_spi.h" left="0" top="18" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="9" y="46" useTextEdit="1" path="Source/config/sdk_config.h" left="0" top="20" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="31" useTextEdit="1" path="Source/platform/port.h" left="0" top="5" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="13" useTextEdit="1" path="../../Src/examples/ex_01d_tx_timed_sleep/tx_timed_sleep.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="59" useTextEdit="1" path="sdk/components/libraries/util/app_util_platform.h" left="0" top="59" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="33" y="106" useTextEdit="1" path="../../Shared/dwt_uwb_driver/deca_device_api.h" left="0" top="106" codecName="Default"/>
  </Files>
- <EMStudioWindow activeProject="dw3000_api" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="Debug" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="" debugSearchPath="" autoConnectCapabilities="3711"/>
+ <EMStudioWindow activeProject="dw3000_api" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="Debug" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="/home/pavel/apps/LOC-PAISA/DW3_QM33_SDK_1.0.2/Drivers/API/Build_Platforms/nRF52840-DK/sdk/components/ble/common" debugSearchPath="" autoConnectCapabilities="3711"/>
 </session>
