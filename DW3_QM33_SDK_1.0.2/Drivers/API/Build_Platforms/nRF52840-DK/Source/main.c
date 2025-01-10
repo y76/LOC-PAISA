@@ -127,6 +127,7 @@ int main(void)
     {
         // Run the selected example as selected in example_selection.h
         printf("skip");
+
         example_pointer();
     }
     /* USER CODE END 2 */

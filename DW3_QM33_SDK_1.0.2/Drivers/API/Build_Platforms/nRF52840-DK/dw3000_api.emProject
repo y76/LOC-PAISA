@@ -298,8 +298,11 @@
         <file file_name="../../Shared/dwt_uwb_driver/deca_rsl.c" />
         <file file_name="../../Shared/dwt_uwb_driver/deca_rsl.h" />
       </folder>
+      <file file_name="sdk/components/ble/common/ble_advdata.c" />
       <file file_name="Source/main.c" />
       <file file_name="sdk/integration/nrfx/legacy/nrf_drv_uart.c" />
+      <file file_name="sdk/components/softdevice/common/nrf_sdh.c" />
+      <file file_name="sdk/components/softdevice/common/nrf_sdh_ble.c" />
       <file file_name="sdk/modules/nrfx/drivers/src/nrfx_uart.c" />
       <file file_name="sdk/modules/nrfx/drivers/src/nrfx_uarte.c" />
     </folder>
