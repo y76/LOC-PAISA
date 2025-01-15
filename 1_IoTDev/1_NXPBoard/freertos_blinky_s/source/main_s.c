@@ -93,6 +93,10 @@ typedef void (*NonSecureResetHandler_t)(void) __attribute__((cmse_nonsecure_call
 #define WIFI_USART_CLK_SRC  	kCLOCK_Flexcomm4
 #define WIFI_USART_CLK_FREQ 	CLOCK_GetFlexCommClkFreq(0U)
 
+#define WIFI_USART2         USART2
+#define WIFI_USART2_CLK_SRC kCLOCK_Flexcomm2
+#define WIFI_USART2_CLK_FREQ CLOCK_GetFlexCommClkFreq(2U)
+
 #define PACKET_SEND_TIMER	5
 #define ATTESTATION_TIMER	5
 
@@ -372,6 +376,8 @@ void syncAck(const uint8_t *resp_buffer)
 	PRINTF("\r\n");
 
 	USART_WriteBlocking(WIFI_USART, ack_buffer, msg_len);
+    USART_WriteBlocking(WIFI_USART2, ack_buffer, msg_len);
+
 
 }
 
@@ -527,6 +533,8 @@ void announcement()
 	PRINTF("\r\n");
 
 	USART_WriteBlocking(WIFI_USART, msg, msg_len);
+    USART_WriteBlocking(WIFI_USART2, msg, msg_len);
+
 }
 
 
@@ -626,6 +634,7 @@ int main(void)
 
 	USART_Init(WIFI_USART, &config, WIFI_USART_CLK_FREQ);
 
+	USART_Init(WIFI_USART2, &config, WIFI_USART2_CLK_FREQ);
     /* Init RTC */
    	RTC_Init(RTC);
 
