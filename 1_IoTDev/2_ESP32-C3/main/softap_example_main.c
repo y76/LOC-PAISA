@@ -33,16 +33,22 @@ static void uart_task(void *arg)
     ESP_ERROR_CHECK(uart_param_config(ECHO_UART_PORT_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(ECHO_UART_PORT_NUM, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS));
 
-    uint8_t *data = (uint8_t *)malloc(BUF_SIZE);
+    const char* message = "hello\n";
 
     while (1) {
-        // Read data from UART
+        // Send "hello" message
+        uart_write_bytes(ECHO_UART_PORT_NUM, message, strlen(message));
+        
+        // Add a small delay to not flood the UART
+        vTaskDelay(1000 / portTICK_PERIOD_MS);  // 1 second delay
+
+        /* Reception code commented out
+        uint8_t *data = (uint8_t *)malloc(BUF_SIZE);
         int len = uart_read_bytes(ECHO_UART_PORT_NUM, data, (BUF_SIZE - 1), 20 / portTICK_PERIOD_MS);
         
         if (len > 0) {
-            data[len] = '\0';  // Null terminate to safely print as string
+            data[len] = '\0';
             ESP_LOGI(TAG, "Received %d bytes: %s", len, data);
-            // Also print hex values for non-printable characters
             ESP_LOGI(TAG, "Hex values:");
             for(int i = 0; i < len; i++) {
                 printf("%02X ", data[i]);
@@ -52,6 +58,7 @@ static void uart_task(void *arg)
             
             uart_write_bytes(ECHO_UART_PORT_NUM, (const char *)data, len);
         }
+        */
     }
 }
 

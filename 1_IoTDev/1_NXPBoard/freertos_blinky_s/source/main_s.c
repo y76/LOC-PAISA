@@ -91,10 +91,14 @@ typedef void (*NonSecureResetHandler_t)(void) __attribute__((cmse_nonsecure_call
 
 #define WIFI_USART          	USART4
 #define WIFI_USART_CLK_SRC  	kCLOCK_Flexcomm4
+#define WIFI_USART_IRQn         FLEXCOMM4_IRQn
+#define WIFI_USART_IRQHandler   FLEXCOMM4_IRQHandler
 #define WIFI_USART_CLK_FREQ 	CLOCK_GetFlexCommClkFreq(0U)
 
 #define WIFI_USART2         USART2
 #define WIFI_USART2_CLK_SRC kCLOCK_Flexcomm2
+#define WIFI_USART2_IRQn    FLEXCOMM2_IRQn
+#define WIFI_USART2_IRQHandler   FLEXCOMM2_IRQHandler
 #define WIFI_USART2_CLK_FREQ CLOCK_GetFlexCommClkFreq(2U)
 
 #define PACKET_SEND_TIMER	5
@@ -235,6 +239,38 @@ void __sha256(const char *msg, size_t msg_len, char *digest)
 	mbedtls_sha256_starts(&sha256, 0);
 	mbedtls_sha256_update(&sha256, msg, msg_len);
 	mbedtls_sha256_finish(&sha256, digest);
+}
+
+void WIFI_USART_IRQHandler(void)
+{
+    /* If new data arrived. */
+    while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART))
+    {
+        uint8_t receivedByte = USART_ReadByte(WIFI_USART);
+        PRINTF("USART4 Received: 0x%02X\n", receivedByte);
+
+        // Process received data as needed
+        // For now just print it
+    }
+
+    USART_ClearStatusFlags(WIFI_USART, kUSART_RxError);
+    SDK_ISR_EXIT_BARRIER;
+}
+
+void WIFI_USART2_IRQHandler(void)
+{
+    /* If new data arrived. */
+    while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART2))
+    {
+        uint8_t receivedByte = USART_ReadByte(WIFI_USART2);
+        PRINTF("USART2 Received: 0x%02X\n", receivedByte);
+
+        // Process received data as needed
+        // For now just print it
+    }
+
+    USART_ClearStatusFlags(WIFI_USART2, kUSART_RxError);
+    SDK_ISR_EXIT_BARRIER;
 }
 
 void syncReq(uint8_t *req_buffer)
@@ -635,6 +671,12 @@ int main(void)
 	USART_Init(WIFI_USART, &config, WIFI_USART_CLK_FREQ);
 
 	USART_Init(WIFI_USART2, &config, WIFI_USART2_CLK_FREQ);
+
+    USART_EnableInterrupts(WIFI_USART, kUSART_RxLevelInterruptEnable | kUSART_RxErrorInterruptEnable);
+    USART_EnableInterrupts(WIFI_USART2, kUSART_RxLevelInterruptEnable | kUSART_RxErrorInterruptEnable);
+    EnableIRQ(WIFI_USART_IRQn);
+    EnableIRQ(WIFI_USART2_IRQn);
+
     /* Init RTC */
    	RTC_Init(RTC);
 
