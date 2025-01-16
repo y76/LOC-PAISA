@@ -1,6 +1,6 @@
 /*! ----------------------------------------------------------------------------
  *  @file    simple_tx.c
- *  @brief   Simple TX example code with UART reception and BLE advertising
+ *  @brief   Simple TX example code with UART reception
  */
 
 #include "deca_probe_interface.h"
@@ -13,13 +13,6 @@
 #include <nrf_drv_uart.h>
 #include <nrf_gpio.h>
 
-#include "nrf_sdh.h"
-#include "nrf_sdh_ble.h"
-#include "nrf_sdh_soc.h"
-#include "ble_advdata.h"
-#include "app_error.h"
-#include "nrf_log.h"
-
 #if defined(TEST_SIMPLE_TX)
 
 extern void test_run_info(unsigned char *data);
@@ -27,17 +20,9 @@ extern void test_run_info(unsigned char *data);
 /* Example application name */
 #define APP_NAME "SIMPLE TX v1.0"
 
-/* BLE Configuration */
-#define APP_BLE_CONN_CFG_TAG    1
-#define APP_COMPANY_IDENTIFIER   0x0059  // Nordic Semiconductor ASA company identifier
-#define NON_CONNECTABLE         true     // Set to false if you want connectable advertising
-
-static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;
-static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];
-static ble_gap_adv_data_t m_adv_data;
-
 /* UART Configuration */
 #define UART_RX_PIN  8  // P0.08
+#define UART_TX_PIN 6 //P0.06
 #define UART_BAUDRATE NRF_UART_BAUDRATE_115200
 #define RX_BUF_SIZE 256
 
@@ -68,72 +53,6 @@ static uint8_t tx_msg[] = { 0xC5, 0, 'D', 'E', 'C', 'A', 'W', 'A', 'V', 'E' };
 
 extern dwt_txconfig_t txconfig_options;
 
-/* Initialize BLE stack */
-static void ble_stack_init(void)
-{
-    ret_code_t err_code;
-
-    err_code = nrf_sdh_enable_request();
-    APP_ERROR_CHECK(err_code);
-
-    // Configure BLE stack using the default settings
-    uint32_t ram_start = 0;
-    err_code = nrf_sdh_ble_default_cfg_set(APP_BLE_CONN_CFG_TAG, &ram_start);
-    APP_ERROR_CHECK(err_code);
-
-    // Enable BLE stack
-    err_code = nrf_sdh_ble_enable(&ram_start);
-    APP_ERROR_CHECK(err_code);
-}
-
-/* Initialize BLE advertising */
-static void advertising_init(void)
-{
-    ret_code_t err_code;
-    ble_advdata_t advdata;
-    
-    memset(&advdata, 0, sizeof(advdata));
-    
-    // Configure advertisement data
-    advdata.name_type = BLE_ADVDATA_FULL_NAME;
-    advdata.include_appearance = false;
-    advdata.flags = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
-
-    // Build and set advertising data
-    memset(&m_adv_data, 0, sizeof(m_adv_data));
-    
-    err_code = ble_advdata_encode(&advdata, m_enc_advdata, &m_adv_data.adv_data.len);
-    APP_ERROR_CHECK(err_code);
-    
-    m_adv_data.adv_data.p_data = m_enc_advdata;
-
-    // Configure advertising parameters
-    ble_gap_adv_params_t adv_params;
-    memset(&adv_params, 0, sizeof(adv_params));
-
-    if (NON_CONNECTABLE) {
-        adv_params.properties.type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
-    } else {
-        adv_params.properties.type = BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED;
-    }
-    
-    adv_params.interval = BLE_GAP_ADV_INTERVAL_MIN;
-    adv_params.duration = BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED;
-    adv_params.primary_phy = BLE_GAP_PHY_1MBPS;
-
-    err_code = sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &adv_params);
-    APP_ERROR_CHECK(err_code);
-}
-
-/* Start advertising */
-static void advertising_start(void)
-{
-    ret_code_t err_code;
-    
-    err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
-    APP_ERROR_CHECK(err_code);
-}
-
 /* UART event handler */
 void uart_event_handler(nrf_drv_uart_event_t *p_event, void *p_context)
 {
@@ -155,7 +74,7 @@ void uart_event_handler(nrf_drv_uart_event_t *p_event, void *p_context)
 void uart_init(void)
 {
     nrf_drv_uart_config_t uart_config = {
-        .pseltxd = NRF_UART_PSEL_DISCONNECTED,  // We don't need TX
+        .pseltxd = UART_TX_PIN,  // We don't need TX
         .pselrxd = UART_RX_PIN,                 // P0.08
         .pselcts = NRF_UART_PSEL_DISCONNECTED,  // No hardware flow control
         .pselrts = NRF_UART_PSEL_DISCONNECTED,  // No hardware flow control
@@ -172,11 +91,17 @@ void uart_init(void)
     printf("Baudrate setting: %d\n", uart_config.baudrate);
     
     uint32_t err_code = nrf_drv_uart_init(&uart_instance, &uart_config, uart_event_handler);
-    APP_ERROR_CHECK(err_code);
+    if (err_code != NRF_SUCCESS) {
+        printf("UART initialization failed with error: %d\n", err_code);
+        return;
+    }
     
     // Start receiving
     err_code = nrf_drv_uart_rx(&uart_instance, rx_buf, 1);
-    APP_ERROR_CHECK(err_code);
+    if (err_code != NRF_SUCCESS) {
+        printf("Failed to start RX with error: %d\n", err_code);
+        return;
+    }
     
     printf("UART initialization complete\n");
 }
@@ -186,14 +111,7 @@ void uart_init(void)
  */
 int simple_tx(void)
 {
-    // Initialize BLE stack
-    ble_stack_init();
-    
-    // Initialize and start advertising
-    advertising_init();
-    advertising_start();
-    
-    // Initialize UART
+    // Initialize UART first
     uart_init();
     
     #if USE_SPI2
@@ -262,6 +180,8 @@ int simple_tx(void)
     /* Loop forever sending frames periodically */
     while (1)
     {
+        static uint32_t uart_counter = 0;
+
         /* Write frame data to DW IC and prepare transmission */
         dwt_writetxdata(FRAME_LENGTH - FCS_LEN, tx_msg, 0);
         dwt_writetxfctrl(FRAME_LENGTH, 0, 0);
@@ -276,6 +196,14 @@ int simple_tx(void)
         dwt_writesysstatuslo(DWT_INT_TXFRS_BIT_MASK);
 
         test_run_info((unsigned char *)"TX Frame Sent");
+
+    /* Send UART message every 3 transmissions */
+    uart_counter++;
+    if (uart_counter >= 3) {
+        const char* hello_msg = "hello\n";
+        nrf_drv_uart_tx(&uart_instance, (uint8_t*)hello_msg, strlen(hello_msg));
+        uart_counter = 0;
+    }
 
         /* Execute a delay between transmissions */
         Sleep(TX_DELAY_MS);
