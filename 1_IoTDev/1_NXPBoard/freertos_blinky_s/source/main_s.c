@@ -562,11 +562,61 @@ void announcement()
 	memcpy(msg+msg_len, &time_attest, TIME_SIZE);
 	msg_len += TIME_SIZE;
 
-	PRINTF("Sending message (length %d): ", msg_len);
-	for(int i = 0; i < msg_len; i++) {
-	    PRINTF("%02X ", msg[i]);  // Print each byte in hexadecimal
-	}
-	PRINTF("\r\n");
+	PRINTF("\r\n=== Message Components Breakdown ===\r\n");
+
+		// Print n_dev (32 bytes)
+		PRINTF("n_dev (32 bytes): ");
+		for(int i = 0; i < NONCE_SIZE; i++) {
+		    PRINTF("%02X ", msg[i]);
+		}
+		PRINTF("\r\n");
+
+		// Print curTS (4 bytes)
+		PRINTF("curTS (4 bytes): ");
+		for(int i = NONCE_SIZE; i < NONCE_SIZE + TIME_SIZE; i++) {
+		    PRINTF("%02X ", msg[i]);
+		}
+		PRINTF(" (Decimal: %u)\r\n", curTs);
+
+		// Print signature (variable length)
+		PRINTF("signature (variable length): ");
+		for(int i = NONCE_SIZE + TIME_SIZE; i < msg_len - m_srv_url_len - sizeof(m_srv_url_len) - ATT_SIZE - TIME_SIZE; i++) {
+		    PRINTF("%02X ", msg[i]);
+		}
+		PRINTF("\r\n");
+
+		// Print M_SRV_URL
+		PRINTF("M_SRV_URL (%d bytes): %s\r\n", m_srv_url_len, M_SRV_URL);
+
+		// Print m_srv_url_len (1 byte)
+		PRINTF("m_srv_url_len (1 byte): %02X (Decimal: %u)\r\n", m_srv_url_len, m_srv_url_len);
+
+		// Print attest_result (1 byte)
+		PRINTF("attest_result (1 byte): %02X\r\n", attest_result[0]);
+
+		// Print time_attest (4 bytes)
+		PRINTF("time_attest (4 bytes): ");
+		uint32_t time_att_offset = msg_len - TIME_SIZE;
+		for(int i = time_att_offset; i < msg_len; i++) {
+		    PRINTF("%02X ", msg[i]);
+		}
+		PRINTF(" (Decimal: %u)\r\n", time_attest);
+
+		PRINTF("\r\n=== Signature Components Breakdown ===\r\n");
+		PRINTF("The signature was generated over:\r\n");
+		PRINTF("- n_dev (32 bytes)\r\n");
+		PRINTF("- time_cur (4 bytes)\r\n");
+		PRINTF("- id_dev (4 bytes): %u\r\n", id_dev);
+		PRINTF("- H(M_SRV_URL) (32 bytes)\r\n");
+		PRINTF("- attest_result (1 byte)\r\n");
+		PRINTF("- time_attest (4 bytes)\r\n");
+
+		PRINTF("\r\n=== Complete Raw Message ===\r\n");
+		PRINTF("Full message (length %d): ", msg_len);
+		for(int i = 0; i < msg_len; i++) {
+		    PRINTF("%02X ", msg[i]);
+		}
+		PRINTF("\r\n");
 
 	USART_WriteBlocking(WIFI_USART, msg, msg_len);
     USART_WriteBlocking(WIFI_USART2, msg, msg_len);

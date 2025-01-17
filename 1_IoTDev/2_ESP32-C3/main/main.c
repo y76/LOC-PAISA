@@ -95,6 +95,8 @@ uint8_t beacon_raw[BUF_SIZE] = {
 uint8_t beacon_raw_size = 70; 
 uint8_t beacon_raw_ascii[155];
 uint8_t instance;
+
+
 static void ext_bleprph_advertise_init(void) {
     struct ble_gap_ext_adv_params params;
     instance = 0;
@@ -110,53 +112,56 @@ static void ext_bleprph_advertise_init(void) {
     /* use defaults for non-set params */
     memset(&params, 0, sizeof(params));
 
-    /* Configure for maximum visibility */
+    /* enable connectable advertising */
     params.connectable = 0;
-    params.scannable = 1;
-    params.legacy_pdu = 1;     // Use legacy advertising for better compatibility
+
+    /* advertise using random addr */
     params.own_addr_type = BLE_OWN_ADDR_PUBLIC;
+
     params.primary_phy = BLE_HCI_LE_PHY_1M;
-    params.secondary_phy = BLE_HCI_LE_PHY_1M;
-    params.tx_power = 127;
-    params.sid = 0;
-    
-    params.itvl_min = BLE_GAP_ADV_FAST_INTERVAL2_MIN;
-    params.itvl_max = BLE_GAP_ADV_FAST_INTERVAL2_MIN;
+    params.secondary_phy = BLE_HCI_LE_PHY_2M;
+    // params.tx_power = 127;
+    params.sid = 1;
+
+    params.itvl_min = BLE_GAP_ADV_FAST_INTERVAL1_MIN;
+    params.itvl_max = BLE_GAP_ADV_FAST_INTERVAL1_MIN;
 
     /* configure instance 0 */
     rc = ble_gap_ext_adv_configure(instance, &params, NULL,
                                    bleprph_gap_event, NULL);
     assert(rc == 0);
 }
-static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen)
+
+/**
+ * Enables advertising with the following parameters:
+ *     o General discoverable mode.
+ *     o Undirected connectable mode.
+ */
+static void
+ext_bleprph_advertise(const uint8_t* r_msg, int msglen)
 {
-    static uint8_t counter = 0;
     struct os_mbuf *data;
+    char DB_PAISA_ID[] = "DB-REQ";
     int rc;
 
-    /* Create manufacturer specific data */
-    uint8_t adv_data[] = {
-        // Flags
-        0x02, 0x01, 0x06,
-        
-        // Manufacturer specific data
-        0x0D, 0xFF,        // Length (13) and Mfg specific data type
-        0xE5, 0x02,        // Company ID (0x02E5)
-        'H', 'E', 'L', 'L', 'O', '_', 'E', 'S', 'P', counter  // Add counter at end
-    };
+    memmove(r_msg+strlen(DB_PAISA_ID), r_msg, msglen);
+    memcpy(r_msg, DB_PAISA_ID, strlen(DB_PAISA_ID));
+    msglen += strlen(DB_PAISA_ID);
 
-    counter++; // Increment counter for next broadcast
-
-    /* Get mbuf */
-    data = os_msys_get_pkthdr(sizeof(adv_data), 0);
+    /* get mbuf for scan rsp data */
+    data = os_msys_get_pkthdr(msglen, 0);
+    // data = os_msys_get_pkthdr(beacon_raw_size, 0);
     assert(data);
 
-    rc = os_mbuf_append(data, adv_data, sizeof(adv_data));
+    /* fill mbuf with scan rsp data */
+    // rc = os_mbuf_append(data, beacon_raw, beacon_raw_size);
+    rc = os_mbuf_append(data, r_msg, msglen);
     assert(rc == 0);
 
     rc = ble_gap_ext_adv_set_data(instance, data);
     assert(rc == 0);
 
+    /* start advertising */
     rc = ble_gap_ext_adv_start(instance, 0, 0);
     assert(rc == 0);
 }
@@ -376,27 +381,98 @@ static void eval_task()
         uart_write_bytes(ECHO_UART_PORT_NUM, data, strlen(data));
     }
 }
+
 static void uart_task()
 {
+    static const char *RX_TASK_TAG = "UART_TASK";
     static const char *BT_TASK_TAG = "BT_TASK";
-    int rc;
+    esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
+    uint8_t *data = (uint8_t *)malloc(BUF_SIZE+1);
     
-    ESP_LOGI(BT_TASK_TAG, "Starting continuous beacon");
-    
-    while(1) {
-        // Stop any existing advertisement
-        if (ble_gap_ext_adv_active(instance)) {
-            rc = ble_gap_ext_adv_stop(instance);
-            assert(rc == 0);
+    while (1) {
+        const int rxBytes = uart_read_bytes(ECHO_UART_PORT_NUM, data, BUF_SIZE, 20 / portTICK_PERIOD_MS);
+        if (rxBytes > 6) {
+            data[rxBytes] = 0;
+            
+            ESP_LOGI(RX_TASK_TAG, "\n=== Message Components Breakdown ===\n");
+            
+            // Print n_dev (32 bytes)
+            ESP_LOGI(RX_TASK_TAG, "n_dev (32 bytes):");
+            for(int i = 0; i < 32; i++) {
+                printf("%02X ", data[i]);
+            }
+            printf("\n");
+            
+            // Print curTS (4 bytes)
+            ESP_LOGI(RX_TASK_TAG, "curTS (4 bytes):");
+            for(int i = 32; i < 36; i++) {
+                printf("%02X ", data[i]);
+            }
+            uint32_t curTs = *(uint32_t*)(data + 32);
+            printf(" (Decimal: %lu)\n", curTs);
+            
+            // Calculate signature length and position
+            int sig_start = 36;
+            int url_len = data[rxBytes - 6];
+            int sig_len = rxBytes - (sig_start + url_len + 6);
+            
+            // Print signature
+            ESP_LOGI(RX_TASK_TAG, "signature (length %d):", sig_len);
+            for(int i = sig_start; i < sig_start + sig_len; i++) {
+                printf("%02X ", data[i]);
+            }
+            printf("\n");
+            
+            // Print M_SRV_URL
+            ESP_LOGI(RX_TASK_TAG, "M_SRV_URL (%d bytes): ", url_len);
+            for(int i = sig_start + sig_len; i < sig_start + sig_len + url_len; i++) {
+                printf("%c", data[i]);
+            }
+            printf("\n");
+            
+            // Print attest_result (1 byte)
+            ESP_LOGI(RX_TASK_TAG, "attest_result (1 byte): %02X", data[rxBytes - 5]);
+            
+            // Print time_attest (4 bytes)
+            ESP_LOGI(RX_TASK_TAG, "time_attest (4 bytes):");
+            for(int i = rxBytes - 4; i < rxBytes; i++) {
+                printf("%02X ", data[i]);
+            }
+            uint32_t time_attest = *(uint32_t*)(data + rxBytes - 4);
+            printf(" (Decimal: %lu)\n", time_attest);
+            
+            // Print full message
+            ESP_LOGI(RX_TASK_TAG, "\n=== Complete Raw Message ===");
+            ESP_LOGI(RX_TASK_TAG, "Full message (length %d):", rxBytes);
+            for(int i = 0; i < rxBytes; i++) {
+                printf("%02X ", data[i]);
+            }
+            printf("\n");
+
+            if (strncmp((const char *)data + rxBytes - strlen(BRD_END_CHAR), BRD_END_CHAR, strlen(BRD_END_CHAR)) == 0)
+            {
+                ext_bleprph_advertise(data, rxBytes - strlen(BRD_END_CHAR));
+
+                // wait 3 seconds
+                ESP_LOGD(tag, "Read %d bytes: '%s'", rxBytes, data);
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
+                int rc = ble_gap_ext_adv_stop(instance);
+                assert(rc == 0);
+
+                ble_scan();
+            }
+            else if (strncmp((const char *)data + rxBytes - strlen(NSC_END_CHAR), NSC_END_CHAR, strlen(NSC_END_CHAR)) == 0)
+            {
+                // This message is assumed to be sent out to server, but we do not implement the server side
+                ESP_LOGD(RX_TASK_TAG, "[%lld us] Temperature: %f", esp_timer_get_time(), *(float *)data);
+            }
         }
-        
-        // Start new advertisement with updated counter
-        ext_bleprph_advertise(NULL, 0);
-        
-        ESP_LOGI(BT_TASK_TAG, "Beacon updated");
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
+    free(data);
 }
+
+
+
 void app_main(void)
 {
     int rc;
