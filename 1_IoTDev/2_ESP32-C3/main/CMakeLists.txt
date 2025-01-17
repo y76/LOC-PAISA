@@ -1,2 +1,6 @@
-idf_component_register(SRCS "softap_example_main.c"
-                    INCLUDE_DIRS ".")
+set(srcs "main.c"
+         "gatt_svr.c")
+
+idf_component_register(SRCS "${srcs}"
+                       INCLUDE_DIRS "."
+                       )
