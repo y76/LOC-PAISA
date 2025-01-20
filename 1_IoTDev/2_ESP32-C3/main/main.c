@@ -170,6 +170,9 @@ static void ext_bleprph_advertise_init(void) {
  *     o General discoverable mode.
  *     o Undirected connectable mode.
  */
+
+/*
+
 static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen) 
 {
     struct os_mbuf *data;
@@ -211,6 +214,83 @@ static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen)
     adv_data[6] = 0x02;           // Company ID (MSB)
 
     memcpy(&adv_data[7], r_msg, msglen);
+
+    // Debug print the final advertisement packet
+    printf("Final advertisement packet (%d bytes): ", total_adv_length);
+    for(int i = 0; i < total_adv_length; i++) {
+        printf("%02X ", adv_data[i]);
+    }
+    printf("\n");
+
+    // Make sure advertising is stopped before setting new data
+    ble_gap_ext_adv_stop(instance);
+
+    data = os_msys_get_pkthdr(&large_mbuf_pool, 0);
+    if (!data) {
+        printf("Failed to allocate mbuf!\n");
+        free(adv_data);
+        return;
+    }
+
+    rc = os_mbuf_append(data, adv_data, total_adv_length);
+    if (rc != 0) {
+        printf("Failed to append to mbuf! rc=%d\n", rc);
+        free(adv_data);
+        return;
+    }
+
+    rc = ble_gap_ext_adv_set_data(instance, data);
+    if (rc != 0) {
+        printf("Failed to set advertisement data! rc=%d\n", rc);
+        free(adv_data);
+        return;
+    }
+
+    rc = ble_gap_ext_adv_start(instance, 0, 0);
+    if (rc != 0) {
+        printf("Failed to start advertising! rc=%d\n", rc);
+        free(adv_data);
+        return;
+    }
+
+    free(adv_data);
+    printf("Advertisement started successfully\n");
+}*/
+static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen) 
+{
+    struct os_mbuf *data;
+    int rc;
+
+    // Limit to first 99 bytes
+    int payload_len = (msglen > 101) ? 101 : msglen;
+
+    printf("UART data (first %d bytes): ", payload_len);
+    for(int i = 0; i < payload_len; i++) {
+        printf("%02X ", r_msg[i]);
+    }
+    printf("\n");
+
+    uint8_t total_adv_length = 3 + 2 + 2 + payload_len;  // Flags + header + company ID + payload
+    
+    uint8_t* adv_data = malloc(total_adv_length);
+    if (adv_data == NULL) {
+        printf("Memory allocation failed!\n");
+        return;
+    }
+
+    // Standard flags
+    adv_data[0] = 0x02;           // Length of flags field
+    adv_data[1] = 0x01;           // Flags data type
+    adv_data[2] = 0x06;           // Flags value
+    
+    // Manufacturer specific data
+    adv_data[3] = payload_len + 3;  // Length of mfg specific data (payload + company ID)
+    adv_data[4] = 0xFF;           // Manufacturer specific data type
+    adv_data[5] = 0xE5;           // Company ID (LSB)
+    adv_data[6] = 0x02;           // Company ID (MSB)
+
+    // Copy first 99 bytes (or less) of UART data
+    memcpy(&adv_data[7], r_msg, payload_len);
 
     // Debug print the final advertisement packet
     printf("Final advertisement packet (%d bytes): ", total_adv_length);
