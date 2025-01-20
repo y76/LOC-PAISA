@@ -26,7 +26,7 @@
 #include "host/util/util.h"
 #include "console/console.h"
 #include "services/gap/ble_svc_gap.h"
-
+#define CONFIG_EXAMPLE_EXTENDED_ADV 1
 /* non ble imports */
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -43,6 +43,7 @@
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
 
+#include "host/ble_hs_mbuf.h"
 
 // ble config
 static const char *tag = "NimBLE_BLE_PRPH";
@@ -73,6 +74,36 @@ void ble_store_config_init(void);
 #define NSC_END_CHAR "NSCEND"
 
 #define BUF_SIZE (155)
+
+#define MBUF_DATA_SIZE 260 // Maximum advertising data length is 255 bytes
+
+// Declare the mbuf pool variables
+struct os_mbuf_pool large_mbuf_pool;
+struct os_mempool large_mbuf_mempool;
+uint8_t large_mbuf_buffer[OS_MEMPOOL_BYTES(10, MBUF_DATA_SIZE)];
+
+void init_large_mbuf_pool(void) {
+    int rc;
+
+    // Initialize the memory pool for mbufs
+    rc = os_mempool_init(
+        &large_mbuf_mempool,
+        10, // Number of mbufs in the pool
+        MBUF_DATA_SIZE,
+        large_mbuf_buffer,
+        "large_mbuf_mempool"
+    );
+    assert(rc == 0);
+
+    // Initialize the mbuf pool with the memory pool
+    rc = os_mbuf_pool_init(
+        &large_mbuf_pool,
+        &large_mbuf_mempool,
+        MBUF_DATA_SIZE,
+        10
+    );
+    assert(rc == 0);
+}
 
 // beacon config
 uint8_t beacon_raw[BUF_SIZE] = {
@@ -114,13 +145,15 @@ static void ext_bleprph_advertise_init(void) {
 
     /* enable connectable advertising */
     params.connectable = 0;
+    params.scannable = 0;
+    params.legacy_pdu = 0;
 
     /* advertise using random addr */
     params.own_addr_type = BLE_OWN_ADDR_PUBLIC;
 
     params.primary_phy = BLE_HCI_LE_PHY_1M;
     params.secondary_phy = BLE_HCI_LE_PHY_2M;
-    // params.tx_power = 127;
+    //params.tx_power = 127;
     params.sid = 1;
 
     params.itvl_min = BLE_GAP_ADV_FAST_INTERVAL1_MIN;
@@ -137,35 +170,89 @@ static void ext_bleprph_advertise_init(void) {
  *     o General discoverable mode.
  *     o Undirected connectable mode.
  */
-static void
-ext_bleprph_advertise(const uint8_t* r_msg, int msglen)
+static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen) 
 {
     struct os_mbuf *data;
-    char DB_PAISA_ID[] = "DB-REQ";
     int rc;
 
-    memmove(r_msg+strlen(DB_PAISA_ID), r_msg, msglen);
-    memcpy(r_msg, DB_PAISA_ID, strlen(DB_PAISA_ID));
-    msglen += strlen(DB_PAISA_ID);
+    // Add debug print
+    printf("Incoming UART message length: %d\n", msglen);
+    printf("UART message content: ");
+    for(int i = 0; i < msglen; i++) {
+        printf("%02X ", r_msg[i]);
+    }
+    printf("\n");
 
-    /* get mbuf for scan rsp data */
-    data = os_msys_get_pkthdr(msglen, 0);
-    // data = os_msys_get_pkthdr(beacon_raw_size, 0);
-    assert(data);
+    // ???????????????????????????????????????
+    if (msglen > 23) {  
+        printf("msglen: %d", msglen);
+        printf("Warning: Message too long for advertisement packet\n");
+        msglen = msglen/2;  // Truncate to maximum allowed
+        printf("msglen: %d", msglen);
+    }
 
-    /* fill mbuf with scan rsp data */
-    // rc = os_mbuf_append(data, beacon_raw, beacon_raw_size);
-    rc = os_mbuf_append(data, r_msg, msglen);
-    assert(rc == 0);
+    uint8_t total_adv_length = 3 + 2 + 2 + msglen;
+    
+    uint8_t* adv_data = malloc(total_adv_length);
+    if (adv_data == NULL) {
+        printf("Memory allocation failed!\n");
+        return;
+    }
+
+    // Standard flags
+    adv_data[0] = 0x02;           // Length of flags field
+    adv_data[1] = 0x01;           // Flags data type
+    adv_data[2] = 0x06;           // Flags value
+    
+    // Manufacturer specific data
+    adv_data[3] = msglen + 3;     // Length of mfg specific data (payload + company ID)
+    adv_data[4] = 0xFF;           // Manufacturer specific data type
+    adv_data[5] = 0xE5;           // Company ID (LSB)
+    adv_data[6] = 0x02;           // Company ID (MSB)
+
+    memcpy(&adv_data[7], r_msg, msglen);
+
+    // Debug print the final advertisement packet
+    printf("Final advertisement packet (%d bytes): ", total_adv_length);
+    for(int i = 0; i < total_adv_length; i++) {
+        printf("%02X ", adv_data[i]);
+    }
+    printf("\n");
+
+    // Make sure advertising is stopped before setting new data
+    ble_gap_ext_adv_stop(instance);
+
+    data = os_msys_get_pkthdr(&large_mbuf_pool, 0);
+    if (!data) {
+        printf("Failed to allocate mbuf!\n");
+        free(adv_data);
+        return;
+    }
+
+    rc = os_mbuf_append(data, adv_data, total_adv_length);
+    if (rc != 0) {
+        printf("Failed to append to mbuf! rc=%d\n", rc);
+        free(adv_data);
+        return;
+    }
 
     rc = ble_gap_ext_adv_set_data(instance, data);
-    assert(rc == 0);
+    if (rc != 0) {
+        printf("Failed to set advertisement data! rc=%d\n", rc);
+        free(adv_data);
+        return;
+    }
 
-    /* start advertising */
     rc = ble_gap_ext_adv_start(instance, 0, 0);
-    assert(rc == 0);
-}
+    if (rc != 0) {
+        printf("Failed to start advertising! rc=%d\n", rc);
+        free(adv_data);
+        return;
+    }
 
+    free(adv_data);
+    printf("Advertisement started successfully\n");
+}
 // msg: ["DP-RES" (6) || n_dev(12) || num_of_n_usr(1) || n_usr_list(12*num_of_n_usr) || M_SRV_URL(10) || attest_result(1) || attest_time(4) || signature(variable)]
 
 
@@ -451,10 +538,10 @@ static void uart_task()
 
             if (strncmp((const char *)data + rxBytes - strlen(BRD_END_CHAR), BRD_END_CHAR, strlen(BRD_END_CHAR)) == 0)
             {
-                ext_bleprph_advertise(data, rxBytes - strlen(BRD_END_CHAR));
+                ext_bleprph_advertise(data, rxBytes/* - strlen(BRD_END_CHAR)*/);
 
                 // wait 3 seconds
-                ESP_LOGD(tag, "Read %d bytes: '%s'", rxBytes, data);
+                ESP_LOGI(tag, "Read %d bytes: '%s'", rxBytes, data);
                 vTaskDelay(3000 / portTICK_PERIOD_MS);
                 int rc = ble_gap_ext_adv_stop(instance);
                 assert(rc == 0);
@@ -464,7 +551,21 @@ static void uart_task()
             else if (strncmp((const char *)data + rxBytes - strlen(NSC_END_CHAR), NSC_END_CHAR, strlen(NSC_END_CHAR)) == 0)
             {
                 // This message is assumed to be sent out to server, but we do not implement the server side
-                ESP_LOGD(RX_TASK_TAG, "[%lld us] Temperature: %f", esp_timer_get_time(), *(float *)data);
+                ESP_LOGI(RX_TASK_TAG, "[%lld us] Temperature: %f", esp_timer_get_time(), *(float *)data);
+            }
+            else
+            {
+                int rc;
+                  if (ble_gap_ext_adv_active(instance)) {
+                        rc = ble_gap_ext_adv_stop(instance);
+                    assert(rc == 0);
+                    }
+                ESP_LOGI(RX_TASK_TAG, "OTHER CASE STARTING TO ADVERTISE");
+                ext_bleprph_advertise(data, rxBytes/* - strlen(BRD_END_CHAR)*/);
+                 vTaskDelay(1000 / portTICK_PERIOD_MS);
+              ///  int rc = ble_gap_ext_adv_stop(instance);
+               /// assert(rc == 0);
+                ///ESP_LOGI(RX_TASK_TAG, "OTHER CASE STOPPING TO ADVERTISE");
             }
         }
     }
@@ -509,6 +610,7 @@ void app_main(void)
     #else
         ble_hs_cfg.sm_sc = 0;
     #endif
+init_large_mbuf_pool();
 
     nimble_port_freertos_init(bleprph_host_task); //scanning
 
