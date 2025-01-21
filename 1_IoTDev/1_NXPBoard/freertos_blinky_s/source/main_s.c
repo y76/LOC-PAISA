@@ -247,7 +247,10 @@ void WIFI_USART_IRQHandler(void)
     while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART))
     {
         uint8_t receivedByte = USART_ReadByte(WIFI_USART);
-        PRINTF("USART4 Received: 0x%02X\n", receivedByte);
+        //why the fuck does doing PRINTF(" %02X", receivedByte); or PRINTF("%02X ", receivedByte); break it?
+        //I'm so serious that doesnt make any sense????
+        //PRINTF("USART4 Received: 0x%02X\n", receivedByte);
+        PRINTF("%02X", receivedByte);
 
         // Process received data as needed
         // For now just print it
@@ -256,6 +259,7 @@ void WIFI_USART_IRQHandler(void)
     USART_ClearStatusFlags(WIFI_USART, kUSART_RxError);
     SDK_ISR_EXIT_BARRIER;
 }
+
 
 void WIFI_USART2_IRQHandler(void)
 {

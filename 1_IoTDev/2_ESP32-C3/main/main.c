@@ -348,7 +348,7 @@ ble_scan(void)
     uint8_t own_addr_type;
     struct ble_gap_disc_params disc_params;
     int rc;
-
+     ble_gap_disc_cancel();
     /* Figure out address to use while advertising (no privacy for now) */
     rc = ble_hs_id_infer_auto(0, &own_addr_type);
     if (rc != 0) {
@@ -469,13 +469,63 @@ bool contains_DB_PAISA(const uint8_t *data, size_t data_length) {
     return false; // Series not found
 }
 
+bool contains_LOC_RESP(const uint8_t *data, size_t data_length) {
+    const char* loc_resp = "LOC-RESP";
+    size_t resp_len = strlen(loc_resp);
+    
+    // Need at least header (7 bytes) plus marker length
+    if (data_length < 7 + resp_len) {
+        return false;
+    }
+
+    // Start checking after manufacturer specific data header
+    for (size_t i = 7; i <= data_length - resp_len; ++i) {
+        if (memcmp(data + i, loc_resp, resp_len) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 static void send_uart_data(const uint8_t *data, uint8_t data_len)
 {
-    uint8_t *buf = (uint8_t *)malloc(BUF_SIZE);
-    uint8_t db_paisa_buf[] = "DB-PAISA:MSGEND";
+    const char *marker = "ABCDEFGHIJUSKDB-POOPOMSGEND";
+    size_t marker_len = strlen(marker);
+    
+    char *buf = (char *)malloc(BUF_SIZE);
+    memset(buf, 0, BUF_SIZE);
 
-    ESP_LOGI(tag, "send data to NXP (%d)", data_len);
-    uart_write_bytes(ECHO_UART_PORT_NUM, db_paisa_buf, sizeof(db_paisa_buf));
+    // Copy just the marker as a test
+    memcpy(buf, marker, marker_len);
+
+    size_t total_len = marker_len;  // Just marker length for now
+
+    ESP_LOGI(tag, "Test 1 - Just marker in buffer:");
+    uart_write_bytes(ECHO_UART_PORT_NUM, buf, total_len);
+    vTaskDelay(pdMS_TO_TICKS(1000));  // Wait a second
+
+    // Now try copying data first
+    memset(buf, 0, BUF_SIZE);
+    if (data && data_len > 0) {
+        memcpy(buf, (char*)data, data_len);
+        ESP_LOGI(tag, "Test 2 - Just data in buffer:");
+        uart_write_bytes(ECHO_UART_PORT_NUM, buf, data_len);
+        vTaskDelay(pdMS_TO_TICKS(1000));  // Wait a second
+    }
+
+    // Finally try both
+   // memset(buf, 0, BUF_SIZE);
+   // if (data && data_len > 0) {
+   //     memcpy(buf, (char*)data, data_len);
+   // }
+   // memcpy(buf + data_len, marker, marker_len);
+
+   // total_len = data_len + marker_len;
+   // ESP_LOGI(tag, "Test 3 - Combined data in buffer:");
+   // uart_write_bytes(ECHO_UART_PORT_NUM, buf, total_len);
+
+    free(buf);
 }
 
 static int bleprph_gap_event(struct ble_gap_event *event, void *arg) 
@@ -487,6 +537,8 @@ static int bleprph_gap_event(struct ble_gap_event *event, void *arg)
     switch (event->type) {
         case BLE_GAP_EVENT_CONNECT:
             ESP_LOGE(tag, "code should not reach here");
+            break;
+            
         case BLE_GAP_EVENT_DISC:
             rc = ble_hs_adv_parse_fields(&fields, event->disc.data,
                                         event->disc.length_data);
@@ -494,24 +546,26 @@ static int bleprph_gap_event(struct ble_gap_event *event, void *arg)
                 return 0;
             }
             return 0;
+            
         case BLE_GAP_EVENT_EXT_DISC:
-            /* An advertisment report was received during GAP discovery. */
+            /* An advertisement report was received during GAP discovery. */
             const struct ble_gap_ext_disc_desc *disc = (struct ble_gap_ext_disc_desc *)&event->disc;
             
-            // if received buffer contains DB-PAISA, call uart task and start advertising
-            // note currently uart task has advertise in it 
-            if(disc->legacy_event_type == 0 && contains_DB_PAISA(disc->data, disc->length_data)){
+            // Check if we received a LOC-RESP message
+            if (disc->legacy_event_type == 0 && contains_LOC_RESP(disc->data, disc->length_data)) {
                 rc = ble_gap_disc_cancel();
                 assert(rc == 0);
 
                 const uint8_t *u8p;
                 u8p = disc->addr.val;
                 
+                // Process the LOC-RESP message
+                ESP_LOGI(tag, "Received LOC-RESP from device: %02x:%02x:%02x:%02x:%02x:%02x",
+                    u8p[5], u8p[4], u8p[3], u8p[2], u8p[1], u8p[0]);
+                
                 send_uart_data(disc->data, disc->length_data);
             }
-
             return 0;
-        
     }
     return 0;
 }
@@ -648,7 +702,12 @@ static void uart_task()
                     }
                 ESP_LOGI(RX_TASK_TAG, "OTHER CASE STARTING TO ADVERTISE");
                 ext_bleprph_advertise(data, rxBytes/* - strlen(BRD_END_CHAR)*/);
-                 vTaskDelay(1000 / portTICK_PERIOD_MS);
+                 //vTaskDelay(1000 / portTICK_PERIOD_MS);
+                 vTaskDelay(3000 / portTICK_PERIOD_MS);
+                 rc = ble_gap_ext_adv_stop(instance);
+                assert(rc == 0);
+
+                ble_scan();
               ///  int rc = ble_gap_ext_adv_stop(instance);
                /// assert(rc == 0);
                 ///ESP_LOGI(RX_TASK_TAG, "OTHER CASE STOPPING TO ADVERTISE");
