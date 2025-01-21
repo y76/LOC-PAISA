@@ -129,34 +129,60 @@ static void ble_scanner_init(void) {
     ESP_LOGI(TAG, "Scanner started successfully");
 }
 
+// Helper function to check for LOC-PAISA in advertisement data
+static bool contains_loc_paisa(const uint8_t *data) {
+    const char* loc_paisa = "LOC-PAISA";
+    const size_t marker_len = strlen(loc_paisa);
+    uint8_t total_length = data[3];
+    
+    // Need at least 7 bytes for header plus enough space for the marker
+    if (total_length < 7 + marker_len) {
+        return false;
+    }
+    
+    // Check if the data after manufacturer specific data contains our marker
+    // Start checking from position 7 (after flags and manufacturer data header)
+    for (size_t i = 7; i <= total_length - marker_len; i++) {
+        if (memcmp(&data[i], loc_paisa, marker_len) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static int ble_gap_event(struct ble_gap_event *event, void *arg) {
     switch (event->type) {
         case BLE_GAP_EVENT_EXT_DISC: {
             const struct ble_gap_disc_desc *disc = &event->disc;
             struct ble_gap_disc_desc_debug *debug_disc = (struct ble_gap_disc_desc_debug *)disc;
             
-            char addr_str[18];
-            snprintf(addr_str, sizeof(addr_str), "%02x:%02x:%02x:%02x:%02x:%02x",
-                     disc->addr.val[6], disc->addr.val[5], disc->addr.val[4],
-                     disc->addr.val[3], disc->addr.val[2], disc->addr.val[1]);
-            
-            if (strcasecmp(addr_str, "68:67:25:4e:08:12") == 0) {
-                if(debug_disc->data != NULL) {
+            if (debug_disc->data != NULL) {
+                // Check for manufacturer specific data type (0xFF) and our marker
+                if (debug_disc->data[4] == 0xFF && contains_loc_paisa(debug_disc->data)) {
+                    ESP_LOGI(TAG, "Found LOC-PAISA advertisement");
+                    
                     // First byte of manufacturer data contains the total length
                     uint8_t total_length = debug_disc->data[3];
-                    if(total_length > 0) {
-                        ESP_LOGI(TAG, "Processing advertisement with length: %d", total_length);
-                        print_adv_data(debug_disc->data, total_length);
-                    }
+                    ESP_LOGI(TAG, "Processing advertisement with length: %d", total_length);
+                    print_adv_data(debug_disc->data, total_length);
+                    
+                    // Log the sender's address
+                    char addr_str[18];
+                    snprintf(addr_str, sizeof(addr_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+                            disc->addr.val[5], disc->addr.val[4], disc->addr.val[3],
+                            disc->addr.val[2], disc->addr.val[1], disc->addr.val[0]);
+                    ESP_LOGI(TAG, "Sender address: %s", addr_str);
                 }
             }
             break;
         }
+        
         case BLE_GAP_EVENT_DISC_COMPLETE:
             ESP_LOGI(TAG, "Discovery complete event (type 8) - restarting scan");
             // Restart scanning
             ble_scanner_init();
             break;
+            
         default:
             ESP_LOGI(TAG, "Other unhandled BLE GAP event: %d", event->type);
             break;

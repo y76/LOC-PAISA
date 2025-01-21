@@ -260,9 +260,11 @@ static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen)
 {
     struct os_mbuf *data;
     int rc;
+    const char* loc_paisa = "LOC-PAISA";
+    int loc_paisa_len = strlen(loc_paisa);
 
     // Limit to first 99 bytes
-    int payload_len = msglen;//(msglen > 101) ? 101 : msglen;
+    int payload_len = msglen;
 
     printf("UART data (first %d bytes): ", payload_len);
     for(int i = 0; i < payload_len; i++) {
@@ -270,7 +272,8 @@ static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen)
     }
     printf("\n");
 
-    uint8_t total_adv_length = 3 + 2 + 2 + payload_len;  // Flags + header + company ID + payload
+    // Calculate total length including LOC-PAISA
+    uint8_t total_adv_length = 3 + 2 + 2 + loc_paisa_len + payload_len;  // Flags + header + company ID + LOC-PAISA + payload
     
     uint8_t* adv_data = malloc(total_adv_length);
     if (adv_data == NULL) {
@@ -284,13 +287,16 @@ static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen)
     adv_data[2] = 0x06;           // Flags value
     
     // Manufacturer specific data
-    adv_data[3] = payload_len + 3;  // Length of mfg specific data (payload + company ID)
+    adv_data[3] = payload_len + loc_paisa_len + 3;  // Length of mfg specific data (payload + LOC-PAISA + company ID)
     adv_data[4] = 0xFF;           // Manufacturer specific data type
     adv_data[5] = 0xE5;           // Company ID (LSB)
     adv_data[6] = 0x02;           // Company ID (MSB)
 
-    // Copy first 99 bytes (or less) of UART data
-    memcpy(&adv_data[7], r_msg, payload_len);
+    // Add LOC-PAISA
+    memcpy(&adv_data[7], loc_paisa, loc_paisa_len);
+
+    // Copy UART data after LOC-PAISA
+    memcpy(&adv_data[7 + loc_paisa_len], r_msg, payload_len);
 
     // Debug print the final advertisement packet
     printf("Final advertisement packet (%d bytes): ", total_adv_length);
@@ -302,7 +308,7 @@ static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen)
     // Make sure advertising is stopped before setting new data
     ble_gap_ext_adv_stop(instance);
 
-    data = os_msys_get_pkthdr(&large_mbuf_pool, 0);
+    data = os_mbuf_get_pkthdr(&large_mbuf_pool, 0);
     if (!data) {
         printf("Failed to allocate mbuf!\n");
         free(adv_data);
