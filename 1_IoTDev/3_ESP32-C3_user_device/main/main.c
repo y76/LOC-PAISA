@@ -3,6 +3,23 @@
  * Companion code for DB-PAISA project
  */
 
+/*
+
+Next steps.
+- [ ] Add LOC-PAISA to announcement on IoT Side
+- [ ] on user side LOOK for LOC-PAISA in message
+- [ ] Generate STS key
+- [ ] Send STS information UWB BOARD -> UART -> Start ranging
+- [ ] Encrypt sts key
+- [ ] bluetooth broadcast BACK to the other way
+- [ ] receive message on IoT side
+- [ ] send message to NXP board
+- [ ] Decrypt on NXP board
+- [ ] send via UART STS key to UWB Board -> Start Ranging
+- [ ] Stop ranging
+
+*/
+
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nimble/nimble_port.h"
