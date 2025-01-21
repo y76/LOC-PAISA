@@ -33,6 +33,7 @@ Next steps.
 #include "esp_nimble_hci.h"
 #include "nimble/nimble_port.h"
 #include "sdkconfig.h"
+#define INSTANCE_ID 0
 
 // Configure the maximum advertisement size
 #define MAX_ADV_DATA_LEN 255  // Maximum extended advertisement data length
@@ -52,6 +53,135 @@ struct __attribute__((packed)) ble_gap_disc_desc_debug {
 static const char *TAG = "BLE_RECEIVER";
 static int ble_gap_event(struct ble_gap_event *event, void *arg);
 static uint8_t own_addr_type;
+
+#define MBUF_DATA_SIZE 260 // Maximum advertising data length is 255 bytes
+
+// Declare the mbuf pool variables
+struct os_mbuf_pool large_mbuf_pool;
+struct os_mempool large_mbuf_mempool;
+uint8_t large_mbuf_buffer[OS_MEMPOOL_BYTES(10, MBUF_DATA_SIZE)];
+
+
+void init_large_mbuf_pool(void) {
+    int rc;
+
+    // Initialize the memory pool for mbufs
+    rc = os_mempool_init(
+        &large_mbuf_mempool,
+        10, // Number of mbufs in the pool
+        MBUF_DATA_SIZE,
+        large_mbuf_buffer,
+        "large_mbuf_mempool"
+    );
+    assert(rc == 0);
+
+    // Initialize the mbuf pool with the memory pool
+    rc = os_mbuf_pool_init(
+        &large_mbuf_pool,
+        &large_mbuf_mempool,
+        MBUF_DATA_SIZE,
+        10
+    );
+    assert(rc == 0);
+}
+
+// Initialize extended advertising
+static void ext_adv_init(void) {
+    struct ble_gap_ext_adv_params params;
+    int rc;
+
+    /* Check if instance is already active */
+    if (ble_gap_ext_adv_active(INSTANCE_ID)) {
+        rc = ble_gap_ext_adv_stop(INSTANCE_ID);
+        assert(rc == 0);
+    }
+
+    /* Set default parameters */
+    memset(&params, 0, sizeof(params));
+
+    /* Set advertising parameters */
+    params.connectable = 0;
+    params.scannable = 0;
+    params.legacy_pdu = 0;
+    params.own_addr_type = own_addr_type;
+    params.primary_phy = BLE_HCI_LE_PHY_1M;
+    params.secondary_phy = BLE_HCI_LE_PHY_2M;
+    params.sid = 1;
+    params.itvl_min = BLE_GAP_ADV_FAST_INTERVAL1_MIN;
+    params.itvl_max = BLE_GAP_ADV_FAST_INTERVAL1_MIN;
+
+    rc = ble_gap_ext_adv_configure(INSTANCE_ID, &params, NULL,
+                                 ble_gap_event, NULL);
+    assert(rc == 0);
+}
+
+// Function to send LOC-RESP advertisement
+static void send_loc_resp(void) {
+    struct os_mbuf *data;
+    int rc;
+    const char* loc_resp = "LOC-RESP";
+    
+    // Calculate total advertisement length
+    uint8_t total_adv_length = 3 + 2 + 2 + strlen(loc_resp);  // Flags + header + company ID + LOC-RESP
+    
+    uint8_t* adv_data = malloc(total_adv_length);
+    if (adv_data == NULL) {
+        ESP_LOGE(TAG, "Memory allocation failed!");
+        return;
+    }
+
+    // Standard flags
+    adv_data[0] = 0x02;           // Length of flags field
+    adv_data[1] = 0x01;           // Flags data type
+    adv_data[2] = 0x06;           // Flags value
+    
+    // Manufacturer specific data
+    adv_data[3] = strlen(loc_resp) + 3;  // Length of mfg specific data
+    adv_data[4] = 0xFF;           // Manufacturer specific data type
+    adv_data[5] = 0xE5;           // Company ID (LSB)
+    adv_data[6] = 0x02;           // Company ID (MSB)
+
+    // Add LOC-RESP
+    memcpy(&adv_data[7], loc_resp, strlen(loc_resp));
+
+    // Stop any ongoing advertising
+    if (ble_gap_ext_adv_active(INSTANCE_ID)) {
+        rc = ble_gap_ext_adv_stop(INSTANCE_ID);
+        assert(rc == 0);
+    }
+
+    data = os_mbuf_get_pkthdr(&large_mbuf_pool, 0);
+    if (!data) {
+        ESP_LOGE(TAG, "Failed to allocate mbuf!");
+        free(adv_data);
+        return;
+    }
+
+    rc = os_mbuf_append(data, adv_data, total_adv_length);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "Failed to append to mbuf! rc=%d", rc);
+        free(adv_data);
+        return;
+    }
+
+    rc = ble_gap_ext_adv_set_data(INSTANCE_ID, data);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "Failed to set advertisement data! rc=%d", rc);
+        free(adv_data);
+        return;
+    }
+
+    // Start advertising for a limited time (e.g., 1000ms)
+    rc = ble_gap_ext_adv_start(INSTANCE_ID, 100, 0);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "Failed to start advertising! rc=%d", rc);
+        free(adv_data);
+        return;
+    }
+
+    free(adv_data);
+    ESP_LOGI(TAG, "LOC-RESP advertisement started");
+}
 
 // Function to print advertisement data in a readable format
 static void print_adv_data(const uint8_t *data, uint16_t length) {
@@ -172,6 +302,16 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
                             disc->addr.val[5], disc->addr.val[4], disc->addr.val[3],
                             disc->addr.val[2], disc->addr.val[1], disc->addr.val[0]);
                     ESP_LOGI(TAG, "Sender address: %s", addr_str);
+
+                    // Temporarily stop scanning while we send our response
+                    ble_gap_disc_cancel();
+                    
+                    // Send LOC-RESP
+                    send_loc_resp();
+                    
+                    // Restart scanning after a short delay
+                    vTaskDelay(pdMS_TO_TICKS(1000));
+                    ble_scanner_init();
                 }
             }
             break;
@@ -179,7 +319,6 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
         
         case BLE_GAP_EVENT_DISC_COMPLETE:
             ESP_LOGI(TAG, "Discovery complete event (type 8) - restarting scan");
-            // Restart scanning
             ble_scanner_init();
             break;
             
@@ -196,6 +335,26 @@ static void ble_host_task(void *param) {
     nimble_port_freertos_deinit();
 }
 
+
+static void ble_sync_cb(void) {
+    int rc;
+
+    // Figure out address to use
+    rc = ble_hs_id_infer_auto(0, &own_addr_type);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "Error determining address type; rc=%d", rc);
+        return;
+    }
+
+    // Initialize extended advertising
+    ext_adv_init();
+    
+    // Initialize and start scanning
+    ble_scanner_init();
+    
+    ESP_LOGI(TAG, "BLE stack synchronized");
+}
+
 void app_main(void) {
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
@@ -208,8 +367,11 @@ void app_main(void) {
     // Initialize the NimBLE stack
     nimble_port_init();
 
+    // Initialize our mbuf pool
+    init_large_mbuf_pool();
+
     // Initialize the NimBLE host configuration
-    ble_hs_cfg.sync_cb = ble_scanner_init;
+    ble_hs_cfg.sync_cb = ble_sync_cb;  // Use our new sync callback
     ble_hs_cfg.reset_cb = NULL;
     ble_hs_cfg.store_status_cb = NULL;
     
@@ -220,5 +382,5 @@ void app_main(void) {
     // Start the NimBLE host task
     nimble_port_freertos_init(ble_host_task);
 
-    ESP_LOGI(TAG, "BLE Scanner initialized and running");
+    ESP_LOGI(TAG, "BLE initialization completed");
 }
