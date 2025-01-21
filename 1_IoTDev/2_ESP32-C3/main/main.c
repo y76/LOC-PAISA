@@ -262,7 +262,7 @@ static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen)
     int rc;
 
     // Limit to first 99 bytes
-    int payload_len = (msglen > 101) ? 101 : msglen;
+    int payload_len = msglen;//(msglen > 101) ? 101 : msglen;
 
     printf("UART data (first %d bytes): ", payload_len);
     for(int i = 0; i < payload_len; i++) {
