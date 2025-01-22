@@ -241,22 +241,51 @@ void __sha256(const char *msg, size_t msg_len, char *digest)
 	mbedtls_sha256_finish(&sha256, digest);
 }
 
+#define MAX_BUFFER_SIZE 256  // Adjust buffer size as needed
+
 void WIFI_USART_IRQHandler(void)
 {
+    static uint8_t rxBuffer[MAX_BUFFER_SIZE];
+    static uint16_t bufferIndex = 0;
+
     /* If new data arrived. */
     while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART))
     {
+        // Read the byte
         uint8_t receivedByte = USART_ReadByte(WIFI_USART);
-        //why the fuck does doing PRINTF(" %02X", receivedByte); or PRINTF("%02X ", receivedByte); break it?
-        //I'm so serious that doesnt make any sense????
-        //PRINTF("USART4 Received: 0x%02X\n", receivedByte);
-        PRINTF("%02X", receivedByte);
 
-        // Process received data as needed
-        // For now just print it
+        // Store the byte in the buffer
+        if (bufferIndex < MAX_BUFFER_SIZE)
+        {
+            rxBuffer[bufferIndex++] = receivedByte;
+        }
+        else
+        {
+            // Buffer is full, handle overflow as needed
+            // For now, we'll just reset the buffer
+            bufferIndex = 0;
+        }
     }
 
+    // Clear any receive errors
     USART_ClearStatusFlags(WIFI_USART, kUSART_RxError);
+
+    // If we've collected some data, print the entire buffer
+    if (bufferIndex > 0)
+    {
+        // Print all collected bytes
+        for (uint16_t i = 0; i < bufferIndex; i++)
+        {
+            PRINTF("%02X", rxBuffer[i]);
+        }
+
+        // Optional: add a newline after printing
+        PRINTF("\n");
+
+        // Reset buffer index
+        bufferIndex = 0;
+    }
+
     SDK_ISR_EXIT_BARRIER;
 }
 

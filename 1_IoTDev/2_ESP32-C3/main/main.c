@@ -501,6 +501,13 @@ static void send_uart_data(const uint8_t *data, uint8_t data_len)
 
     size_t total_len = marker_len;  // Just marker length for now
 
+    // Print marker before sending
+    printf("Test 1 - Sending marker (hex): ");
+    for (size_t i = 0; i < marker_len; i++) {
+        printf("%02X", (unsigned char)marker[i]);
+    }
+    printf("\n");
+
     ESP_LOGI(tag, "Test 1 - Just marker in buffer:");
     uart_write_bytes(ECHO_UART_PORT_NUM, buf, total_len);
     vTaskDelay(pdMS_TO_TICKS(1000));  // Wait a second
@@ -509,21 +516,18 @@ static void send_uart_data(const uint8_t *data, uint8_t data_len)
     memset(buf, 0, BUF_SIZE);
     if (data && data_len > 0) {
         memcpy(buf, (char*)data, data_len);
+        
+        // Print data before sending
+        printf("Test 2 - Sending data (hex): ");
+        for (uint8_t i = 0; i < data_len; i++) {
+            printf("%02X", data[i]);
+        }
+        printf("\n");
+
         ESP_LOGI(tag, "Test 2 - Just data in buffer:");
         uart_write_bytes(ECHO_UART_PORT_NUM, buf, data_len);
         vTaskDelay(pdMS_TO_TICKS(1000));  // Wait a second
     }
-
-    // Finally try both
-   // memset(buf, 0, BUF_SIZE);
-   // if (data && data_len > 0) {
-   //     memcpy(buf, (char*)data, data_len);
-   // }
-   // memcpy(buf + data_len, marker, marker_len);
-
-   // total_len = data_len + marker_len;
-   // ESP_LOGI(tag, "Test 3 - Combined data in buffer:");
-   // uart_write_bytes(ECHO_UART_PORT_NUM, buf, total_len);
 
     free(buf);
 }
