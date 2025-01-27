@@ -34,6 +34,8 @@ Next steps.
 #include "nimble/nimble_port.h"
 #include "esp_random.h"
 #include "sdkconfig.h"
+#include "driver/uart.h"
+
 #define INSTANCE_ID 0
 
 // Configure the maximum advertisement size
@@ -69,14 +71,88 @@ typedef struct {
 static const char *TAG = "BLE_RECEIVER";
 static int ble_gap_event(struct ble_gap_event *event, void *arg);
 static uint8_t own_addr_type;
-
+#define BUF_SIZE (155)
+#define UART_BUF_SIZE (255)
 #define MBUF_DATA_SIZE 260 // Maximum advertising data length is 255 bytes
-
+#define ECHO_UART_PORT_NUM (1)
+#define ECHO_TEST_TXD (6)
+#define ECHO_TEST_RXD (7)
+#define ECHO_TEST_RTS (-1)
+#define ECHO_TEST_CTS (-1)
+#define ECHO_UART_BAUD_RATE (115200)
 // Declare the mbuf pool variables
 struct os_mbuf_pool large_mbuf_pool;
 struct os_mempool large_mbuf_mempool;
 uint8_t large_mbuf_buffer[OS_MEMPOOL_BYTES(10, MBUF_DATA_SIZE)];
 
+
+void uart_init(void)
+{
+    /* Configure parameters of an UART driver,
+     * communication pins and install the driver */
+    uart_config_t uart_config = {
+        .baud_rate = ECHO_UART_BAUD_RATE,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    int intr_alloc_flags = 0;
+
+#if CONFIG_UART_ISR_IN_IRAM
+    intr_alloc_flags = ESP_INTR_FLAG_IRAM;
+#endif
+
+    ESP_ERROR_CHECK(uart_driver_install(ECHO_UART_PORT_NUM, UART_BUF_SIZE * 2, 0, 0, NULL, intr_alloc_flags));
+    ESP_ERROR_CHECK(uart_param_config(ECHO_UART_PORT_NUM, &uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(ECHO_UART_PORT_NUM, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS));
+    ESP_LOGD(TAG, "UART init done");
+}
+
+static void send_uart_data(const uint8_t *data, uint8_t data_len)
+{
+    const char *start_marker = "PAISASTART:";
+    const char *end_marker = ":PAISAEND";
+    size_t start_marker_len = strlen(start_marker);
+    size_t end_marker_len = strlen(end_marker);
+    ESP_LOGI(TAG, "DATA_LEN: %d", data_len);
+    char *buf = (char *)malloc(UART_BUF_SIZE);
+    memset(buf, 0, UART_BUF_SIZE);
+
+    // Build complete message: START_MARKER + DATA + END_MARKER
+    size_t pos = 0;
+    
+    // Copy start marker
+    memcpy(buf, start_marker, start_marker_len);
+    pos += start_marker_len;
+    
+    // Copy data if present
+    if (data && data_len > 0) {
+        memcpy(buf + pos, data, data_len);
+        pos += data_len;
+    }
+    
+    // Copy end marker
+    memcpy(buf + pos, end_marker, end_marker_len);
+    pos += end_marker_len;
+
+    // Print complete message before sending
+    printf("Sending message (hex): ");
+    for (size_t i = 0; i < pos; i++) {
+        printf("%02X", (unsigned char)buf[i]);
+    }
+    printf("\nSending message (ASCII): ");
+    for (size_t i = 0; i < pos; i++) {
+        printf("%c", buf[i]);
+    }
+    printf("\n");
+
+    ESP_LOGI(TAG, "Sending complete message:");
+    uart_write_bytes(ECHO_UART_PORT_NUM, buf, pos);
+
+    free(buf);
+}
 
 void init_large_mbuf_pool(void) {
     int rc;
@@ -335,11 +411,14 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
                     ESP_LOGI(TAG, "STS IV: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
                             sts_iv.iv0, sts_iv.iv1, sts_iv.iv2, sts_iv.iv3);
 
-                    //Generate UWB Information
+                     // Send BLE data over UART first - UNTESTED
+                    send_uart_data(debug_disc->data, total_length);
 
-                    //Send STS Information to the UWB Board Via NXP
-
-                    //Encrypt Message to send to IoT Device
+                    // Create and send STS data over UART - UNTESTED
+                    uint8_t sts_data[32]; // 16 bytes for key + 16 bytes for IV - UNTESTED
+                    memcpy(sts_data, &sts_key, sizeof(sts_key));                // UNTESTED
+                    memcpy(sts_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));// UNTESTED
+                    send_uart_data(sts_data, sizeof(sts_data));                 // UNTESTED
 
                     // Send LOC-RESP
                     send_loc_resp();
@@ -399,6 +478,8 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
     
+     uart_init();
+
     // Initialize the NimBLE stack
     nimble_port_init();
 
