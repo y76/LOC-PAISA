@@ -32,6 +32,7 @@ Next steps.
 #include "nimble/nimble_port_freertos.h"
 #include "esp_nimble_hci.h"
 #include "nimble/nimble_port.h"
+#include "esp_random.h"
 #include "sdkconfig.h"
 #define INSTANCE_ID 0
 
@@ -50,6 +51,21 @@ struct __attribute__((packed)) ble_gap_disc_desc_debug {
     uint16_t more_flags;
     uint8_t *data;  // This should be a pointer
 };
+
+typedef struct {
+    uint32_t key0;
+    uint32_t key1;
+    uint32_t key2;
+    uint32_t key3;
+} sts_key_t;
+
+typedef struct {
+    uint32_t iv0;
+    uint32_t iv1;
+    uint32_t iv2;
+    uint32_t iv3;
+} sts_iv_t;
+
 static const char *TAG = "BLE_RECEIVER";
 static int ble_gap_event(struct ble_gap_event *event, void *arg);
 static uint8_t own_addr_type;
@@ -305,7 +321,26 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
 
                     // Temporarily stop scanning while we send our response
                     ble_gap_disc_cancel();
-                    
+
+                    //Generate STS Key
+                    sts_key_t sts_key;
+                    sts_iv_t sts_iv;
+
+                    // Generate random values for key and IV using ESP32's hardware RNG
+                    esp_fill_random(&sts_key, sizeof(sts_key));  
+                    esp_fill_random(&sts_iv, sizeof(sts_iv));    
+                    ESP_LOGI(TAG, "STS KEY: 0x%08lX 0x%08lX 0x%08lX 0x%08lX", 
+                            sts_key.key0, sts_key.key1, sts_key.key2, sts_key.key3);
+
+                    ESP_LOGI(TAG, "STS IV: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
+                            sts_iv.iv0, sts_iv.iv1, sts_iv.iv2, sts_iv.iv3);
+
+                    //Generate UWB Information
+
+                    //Send STS Information to the UWB Board Via NXP
+
+                    //Encrypt Message to send to IoT Device
+
                     // Send LOC-RESP
                     send_loc_resp();
                     
