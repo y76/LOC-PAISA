@@ -243,12 +243,44 @@ void __sha256(const char *msg, size_t msg_len, char *digest)
 
 #define MAX_BUFFER_SIZE 256  // Adjust buffer size as needed
 
+#define RX_BUFFER_SIZE 256
+#define START_MARKER "PAISASTART:"
+#define END_MARKER ":PAISAEND"
+
+
+static uint8_t rxBuffer[MAX_BUFFER_SIZE];
+static uint16_t bufferIndex = 0;
+
+void findMessage(const uint8_t* buffer, uint16_t length) {
+    // Print for debugging
+    PRINTF("Buffer length: %d\n", length);
+
+    // Search for start marker
+    for (uint16_t i = 0; i < length - strlen(START_MARKER) + 1; i++) {
+        // Debug print to see where we are
+        //PRINTF("Checking position %d: %c\n", i, buffer[i]);
+
+        if (memcmp(buffer + i, START_MARKER, strlen(START_MARKER)) == 0) {
+            uint16_t msgStart = i + strlen(START_MARKER);
+
+            // Search for end marker after start marker
+            for (uint16_t j = msgStart; j < length - strlen(END_MARKER) + 1; j++) {
+                if (memcmp(buffer + j, END_MARKER, strlen(END_MARKER)) == 0) {
+                    PRINTF("Message: ");
+                    for (uint16_t k = msgStart; k < j; k++) {
+                        PRINTF("%c", buffer[k]);
+                    }
+                    PRINTF("\n");
+                    return;
+                }
+            }
+        }
+    }
+}
+
 void WIFI_USART_IRQHandler(void)
 {
-    static uint8_t rxBuffer[MAX_BUFFER_SIZE];
-    static uint16_t bufferIndex = 0;
-
-    /* If new data arrived. */
+    // If new data arrived
     while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART))
     {
         // Read the byte
@@ -258,34 +290,27 @@ void WIFI_USART_IRQHandler(void)
         if (bufferIndex < MAX_BUFFER_SIZE)
         {
             rxBuffer[bufferIndex++] = receivedByte;
+
+            // Check if we have an end marker
+            if (bufferIndex >= strlen(END_MARKER) &&
+                memcmp(&rxBuffer[bufferIndex - strlen(END_MARKER)],
+                      END_MARKER, strlen(END_MARKER)) == 0)
+            {
+                // We have a complete message, process it
+                findMessage(rxBuffer, bufferIndex);
+                // Reset buffer after processing
+                bufferIndex = 0;
+            }
         }
         else
         {
-            // Buffer is full, handle overflow as needed
-            // For now, we'll just reset the buffer
+            // Buffer is full, reset it
             bufferIndex = 0;
         }
     }
 
     // Clear any receive errors
     USART_ClearStatusFlags(WIFI_USART, kUSART_RxError);
-
-    // If we've collected some data, print the entire buffer
-    if (bufferIndex > 0)
-    {
-        // Print all collected bytes
-        for (uint16_t i = 0; i < bufferIndex; i++)
-        {
-            PRINTF("%02X", rxBuffer[i]);
-        }
-
-        // Optional: add a newline after printing
-        PRINTF("\n");
-
-        // Reset buffer index
-        bufferIndex = 0;
-    }
-
     SDK_ISR_EXIT_BARRIER;
 }
 

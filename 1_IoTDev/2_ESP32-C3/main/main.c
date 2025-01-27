@@ -67,7 +67,7 @@ void ble_store_config_init(void);
 #define ECHO_TEST_RXD (7)
 #define ECHO_TEST_RTS (-1)
 #define ECHO_TEST_CTS (-1)
-
+#define HEADER_BYTES (7)
 #define MSG_END_CHAR "MSGEND"
 #define ACK_END_CHAR "ACKEND"
 #define BRD_END_CHAR "BRDEND"
@@ -490,44 +490,44 @@ bool contains_LOC_RESP(const uint8_t *data, size_t data_length) {
 
 static void send_uart_data(const uint8_t *data, uint8_t data_len)
 {
-    const char *marker = "ABCDEFGHIJUSKDB-POOPOMSGEND";
-    size_t marker_len = strlen(marker);
+    const char *start_marker = "PAISASTART:";
+    const char *end_marker = ":PAISAEND";
+    size_t start_marker_len = strlen(start_marker);
+    size_t end_marker_len = strlen(end_marker);
     
     char *buf = (char *)malloc(BUF_SIZE);
     memset(buf, 0, BUF_SIZE);
 
-    // Copy just the marker as a test
-    memcpy(buf, marker, marker_len);
+    // Build complete message: START_MARKER + DATA + END_MARKER
+    size_t pos = 0;
+    
+    // Copy start marker
+    memcpy(buf, start_marker, start_marker_len);
+    pos += start_marker_len;
+    
+    // Copy data if present
+    if (data && data_len > 0) {
+        memcpy(buf + pos, data, data_len);
+        pos += data_len;
+    }
+    
+    // Copy end marker
+    memcpy(buf + pos, end_marker, end_marker_len);
+    pos += end_marker_len;
 
-    size_t total_len = marker_len;  // Just marker length for now
-
-    // Print marker before sending
-    printf("Test 1 - Sending marker (hex): ");
-    for (size_t i = 0; i < marker_len; i++) {
-        printf("%02X", (unsigned char)marker[i]);
+    // Print complete message before sending
+    printf("Sending message (hex): ");
+    for (size_t i = 0; i < pos; i++) {
+        printf("%02X", (unsigned char)buf[i]);
+    }
+    printf("\nSending message (ASCII): ");
+    for (size_t i = 0; i < pos; i++) {
+        printf("%c", buf[i]);
     }
     printf("\n");
 
-    ESP_LOGI(tag, "Test 1 - Just marker in buffer:");
-    uart_write_bytes(ECHO_UART_PORT_NUM, buf, total_len);
-    vTaskDelay(pdMS_TO_TICKS(1000));  // Wait a second
-
-    // Now try copying data first
-    memset(buf, 0, BUF_SIZE);
-    if (data && data_len > 0) {
-        memcpy(buf, (char*)data, data_len);
-        
-        // Print data before sending
-        printf("Test 2 - Sending data (hex): ");
-        for (uint8_t i = 0; i < data_len; i++) {
-            printf("%02X", data[i]);
-        }
-        printf("\n");
-
-        ESP_LOGI(tag, "Test 2 - Just data in buffer:");
-        uart_write_bytes(ECHO_UART_PORT_NUM, buf, data_len);
-        vTaskDelay(pdMS_TO_TICKS(1000));  // Wait a second
-    }
+    ESP_LOGI(tag, "Sending complete message:");
+    uart_write_bytes(ECHO_UART_PORT_NUM, buf, pos);
 
     free(buf);
 }
@@ -567,7 +567,7 @@ static int bleprph_gap_event(struct ble_gap_event *event, void *arg)
                 ESP_LOGI(tag, "Received LOC-RESP from device: %02x:%02x:%02x:%02x:%02x:%02x",
                     u8p[5], u8p[4], u8p[3], u8p[2], u8p[1], u8p[0]);
                 
-                send_uart_data(disc->data, disc->length_data);
+                send_uart_data(disc->data+HEADER_BYTES, disc->length_data-HEADER_BYTES);
             }
             return 0;
     }
