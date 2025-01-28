@@ -12,24 +12,53 @@
 #include <shared_functions.h>
 #include <nrf_drv_uart.h>
 #include <nrf_gpio.h>
+#include <string.h>
 
 #if defined(TEST_SIMPLE_TX)
 
 extern void test_run_info(unsigned char *data);
 
 /* Example application name */
-#define APP_NAME "SIMPLE TX v1.0"
+#define APP_NAME "SIMPLE TX UART RX v1.0"
 
 /* UART Configuration */
 #define UART_RX_PIN  8  // P0.08
-#define UART_TX_PIN 6 //P0.06
+#define UART_TX_PIN 6   // P0.06
 #define UART_BAUDRATE NRF_UART_BAUDRATE_115200
 #define RX_BUF_SIZE 256
+#define START_MARKER "PAISASTART:"
+#define END_MARKER ":PAISAEND"
 
 static nrf_drv_uart_t uart_instance = NRF_DRV_UART_INSTANCE(0);
 static uint8_t rx_buf[RX_BUF_SIZE];
+static uint8_t rxBuffer[RX_BUF_SIZE];
+static uint16_t bufferIndex = 0;
 
-/* Default communication configuration */
+void findMessage(const uint8_t* buffer, uint16_t length) {
+    // Print for debugging
+    printf("Buffer length: %d\n", length);
+
+    // Search for start marker
+    for (uint16_t i = 0; i < length - strlen(START_MARKER) + 1; i++) {
+        if (memcmp(buffer + i, START_MARKER, strlen(START_MARKER)) == 0) {
+            uint16_t msgStart = i + strlen(START_MARKER);
+
+            // Search for end marker after start marker
+            for (uint16_t j = msgStart; j < length - strlen(END_MARKER) + 1; j++) {
+                if (memcmp(buffer + j, END_MARKER, strlen(END_MARKER)) == 0) {
+                    printf("Message: ");
+                    for (uint16_t k = msgStart; k < j; k++) {
+                        printf("%c", buffer[k]);
+                    }
+                    printf("\n");
+                    return;
+                }
+            }
+        }
+    }
+}
+
+/* Default communication configuration. Same as original */
 static dwt_config_t config = {
     5,                /* Channel number. */
     DWT_PLEN_128,     /* Preamble length. Used in TX only. */
@@ -49,7 +78,6 @@ static dwt_config_t config = {
 static uint8_t tx_msg[] = { 0xC5, 0, 'D', 'E', 'C', 'A', 'W', 'A', 'V', 'E' };
 #define BLINK_FRAME_SN_IDX 1
 #define FRAME_LENGTH (sizeof(tx_msg) + FCS_LEN)
-#define TX_DELAY_MS 500
 
 extern dwt_txconfig_t txconfig_options;
 
@@ -58,52 +86,76 @@ void uart_event_handler(nrf_drv_uart_event_t *p_event, void *p_context)
 {
     if (p_event->type == NRF_DRV_UART_EVT_RX_DONE)
     {
-        // Print received data
-        printf("UART RX: ");
-        for(int i = 0; i < p_event->data.rxtx.bytes; i++) {
-            printf("%02X ", p_event->data.rxtx.p_data[i]);
+        // Store the byte in the buffer
+        if (bufferIndex < RX_BUF_SIZE)
+        {
+            rxBuffer[bufferIndex++] = rx_buf[0];
+
+            // Check if we have an end marker
+            if (bufferIndex >= strlen(END_MARKER) &&
+                memcmp(&rxBuffer[bufferIndex - strlen(END_MARKER)],
+                      END_MARKER, strlen(END_MARKER)) == 0)
+            {
+                // We have a complete message, process it
+                findMessage(rxBuffer, bufferIndex);
+                // Reset buffer after processing
+                bufferIndex = 0;
+            }
         }
-        printf("\r\n");
-        
-        // Start receiving again
-        nrf_drv_uart_rx(&uart_instance, rx_buf, 1);  // Receive one byte at a time
+        else
+        {
+            // Buffer is full, reset it
+            bufferIndex = 0;
+        }
+
+        // Start receiving next byte
+        nrf_drv_uart_rx(&uart_instance, rx_buf, 1);
     }
 }
 
 /* Initialize UART for reception */
 void uart_init(void)
 {
+    // Make sure UART pins are configured as GPIO inputs first
+    nrf_gpio_cfg_input(UART_RX_PIN, NRF_GPIO_PIN_PULLUP);
+    
     nrf_drv_uart_config_t uart_config = {
-        .pseltxd = UART_TX_PIN,  // We don't need TX
-        .pselrxd = UART_RX_PIN,                 // P0.08
-        .pselcts = NRF_UART_PSEL_DISCONNECTED,  // No hardware flow control
-        .pselrts = NRF_UART_PSEL_DISCONNECTED,  // No hardware flow control
+        .pseltxd = UART_TX_PIN,
+        .pselrxd = UART_RX_PIN,
+        .pselcts = NRF_UART_PSEL_DISCONNECTED,
+        .pselrts = NRF_UART_PSEL_DISCONNECTED,
         .p_context = NULL,
         .hwfc = NRF_UART_HWFC_DISABLED,
         .parity = NRF_UART_PARITY_EXCLUDED,
-        .baudrate = NRF_UART_BAUDRATE_115200,   // Set explicit baudrate
-        .interrupt_priority = UART_DEFAULT_CONFIG_IRQ_PRIORITY,
+        .baudrate = UART_BAUDRATE,
+        .interrupt_priority = APP_IRQ_PRIORITY_HIGH  // Set high priority for UART interrupts
     };
 
-    // Add debug prints
-    printf("About to initialize UART with:\n");
+    printf("Initializing UART RX...\n");
     printf("RX Pin: %d\n", uart_config.pselrxd);
-    printf("Baudrate setting: %d\n", uart_config.baudrate);
+    printf("Baudrate: %d\n", uart_config.baudrate);
+    printf("IRQ Priority: %d\n", uart_config.interrupt_priority);
     
+    // Initialize UART with event handler
     uint32_t err_code = nrf_drv_uart_init(&uart_instance, &uart_config, uart_event_handler);
-    if (err_code != NRF_SUCCESS) {
+    if (err_code != NRF_SUCCESS)
+    {
         printf("UART initialization failed with error: %d\n", err_code);
         return;
     }
     
-    // Start receiving
+    // Enable UART receiver
+    nrf_drv_uart_rx_enable(&uart_instance);
+    
+    // Start receiving first byte
     err_code = nrf_drv_uart_rx(&uart_instance, rx_buf, 1);
-    if (err_code != NRF_SUCCESS) {
+    if (err_code != NRF_SUCCESS)
+    {
         printf("Failed to start RX with error: %d\n", err_code);
         return;
     }
     
-    printf("UART initialization complete\n");
+    printf("UART RX initialization complete\n");
 }
 
 /**
@@ -177,39 +229,36 @@ int simple_tx(void)
     /* Configure the TX spectrum parameters (power and PG delay) */
     dwt_configuretxrf(&txconfig_options);
 
-    /* Loop forever sending frames periodically */
+    /* Main loop - just transmit the frame when UART data is received */
     while (1)
     {
-        static uint32_t uart_counter = 0;
+        // If we have received UART data, transmit the frame
+      //  if (rx_data_len > 0)
+      //  {
+            /* Write frame data to DW IC and prepare transmission */
+            dwt_writetxdata(FRAME_LENGTH - FCS_LEN, tx_msg, 0);
+            dwt_writetxfctrl(FRAME_LENGTH, 0, 0);
 
-        /* Write frame data to DW IC and prepare transmission */
-        dwt_writetxdata(FRAME_LENGTH - FCS_LEN, tx_msg, 0);
-        dwt_writetxfctrl(FRAME_LENGTH, 0, 0);
+            /* Start transmission */
+            dwt_starttx(DWT_START_TX_IMMEDIATE);
+            
+            /* Poll DW IC until TX frame sent event set */
+            waitforsysstatus(NULL, NULL, DWT_INT_TXFRS_BIT_MASK, 0);
 
-        /* Start transmission */
-        dwt_starttx(DWT_START_TX_IMMEDIATE);
+            /* Clear TX frame sent event */
+            dwt_writesysstatuslo(DWT_INT_TXFRS_BIT_MASK);
+
+         //   test_run_info((unsigned char *)"TX Frame Sent");
+
+            /* Increment frame sequence number */
+            tx_msg[BLINK_FRAME_SN_IDX]++;
+            
+            // Reset the UART buffer
+          //  rx_data_len = 0;
+      //  }
         
-        /* Poll DW IC until TX frame sent event set */
-        waitforsysstatus(NULL, NULL, DWT_INT_TXFRS_BIT_MASK, 0);
-
-        /* Clear TX frame sent event */
-        dwt_writesysstatuslo(DWT_INT_TXFRS_BIT_MASK);
-
-        test_run_info((unsigned char *)"TX Frame Sent");
-
-    /* Send UART message every 3 transmissions */
-    uart_counter++;
-    if (uart_counter >= 3) {
-        const char* hello_msg = "hello\n";
-        nrf_drv_uart_tx(&uart_instance, (uint8_t*)hello_msg, strlen(hello_msg));
-        uart_counter = 0;
-    }
-
-        /* Execute a delay between transmissions */
-        Sleep(TX_DELAY_MS);
-
-        /* Increment frame sequence number */
-        tx_msg[BLINK_FRAME_SN_IDX]++;
+        // Small delay to prevent tight spinning
+        Sleep(1);
     }
 }
 
