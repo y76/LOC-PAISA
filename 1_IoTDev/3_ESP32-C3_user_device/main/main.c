@@ -403,8 +403,15 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg) {
                     sts_iv_t sts_iv;
 
                     // Generate random values for key and IV using ESP32's hardware RNG
-                    esp_fill_random(&sts_key, sizeof(sts_key));  
-                    esp_fill_random(&sts_iv, sizeof(sts_iv));    
+                   // esp_fill_random(&sts_key, sizeof(sts_key));  
+                   // esp_fill_random(&sts_iv, sizeof(sts_iv));   
+
+                    //for now, use generic hardcoded values for development
+                    sts_key = { 0x14EB220F, 0xF86050A8, 0xD1D336AA, 0x14148674 };
+
+                    sts_iv = { 0x1F9A3DE4, 0xD37EC3CA, 0xC44FA8FB, 0x362EEB34 };
+
+
                     ESP_LOGI(TAG, "STS KEY: 0x%08lX 0x%08lX 0x%08lX 0x%08lX", 
                             sts_key.key0, sts_key.key1, sts_key.key2, sts_key.key3);
 
