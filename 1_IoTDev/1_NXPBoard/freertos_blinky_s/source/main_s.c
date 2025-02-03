@@ -246,31 +246,36 @@ void __sha256(const char *msg, size_t msg_len, char *digest)
 #define RX_BUFFER_SIZE 256
 #define START_MARKER "PAISASTART:"
 #define END_MARKER ":PAISAEND"
-
+#define START_MARKER_LENGTH (sizeof("PAISASTART:") - 1)
+#define END_MARKER_LENGTH (sizeof(":PAISAEND") - 1)
 
 static uint8_t rxBuffer[MAX_BUFFER_SIZE];
 static uint16_t bufferIndex = 0;
 
 void findMessage(const uint8_t* buffer, uint16_t length) {
-    // Print for debugging
-    PRINTF("Buffer length: %d\n", length);
+    // Immediate safety checks
+    if (!buffer || length == 0) {
+        return;  // Early exit if buffer is invalid
+    }
 
-    // Search for start marker
-    for (uint16_t i = 0; i < length - strlen(START_MARKER) + 1; i++) {
-        // Debug print to see where we are
-        //PRINTF("Checking position %d: %c\n", i, buffer[i]);
+    // Prevent excessive searching
+    uint16_t max_search = (length < 1000) ? length : 1000;
 
-        if (memcmp(buffer + i, START_MARKER, strlen(START_MARKER)) == 0) {
-            uint16_t msgStart = i + strlen(START_MARKER);
+    for (uint16_t i = 0; i < max_search - START_MARKER_LENGTH + 1; i++) {
+        // Use memcmp with explicit lengths
+        if (memcmp(buffer + i, START_MARKER, START_MARKER_LENGTH) == 0) {
+            uint16_t msgStart = i + START_MARKER_LENGTH;
 
-            // Search for end marker after start marker
-            for (uint16_t j = msgStart; j < length - strlen(END_MARKER) + 1; j++) {
-                if (memcmp(buffer + j, END_MARKER, strlen(END_MARKER)) == 0) {
-                    PRINTF("Message: ");
+            // Bounds-checked inner search
+            for (uint16_t j = msgStart; j < max_search - END_MARKER_LENGTH + 1; j++) {
+                if (memcmp(buffer + j, END_MARKER, END_MARKER_LENGTH) == 0) {
+                    // Safe message extraction
                     for (uint16_t k = msgStart; k < j; k++) {
-                        PRINTF("%c", buffer[k]);
+                        // Optional: add printability check
+                        if (isprint(buffer[k])) {
+                            PRINTF("%c", buffer[k]);
+                        }
                     }
-                    PRINTF("\n");
                     return;
                 }
             }

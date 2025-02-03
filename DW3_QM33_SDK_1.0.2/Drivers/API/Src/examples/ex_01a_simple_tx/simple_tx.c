@@ -13,6 +13,7 @@
 #include <nrf_drv_uart.h>
 #include <nrf_gpio.h>
 #include <string.h>
+#include <ctype.h>
 
 #if defined(TEST_SIMPLE_TX)
 
@@ -35,23 +36,56 @@ static uint8_t rxBuffer[RX_BUF_SIZE];
 static uint16_t bufferIndex = 0;
 
 void findMessage(const uint8_t* buffer, uint16_t length) {
-    // Print for debugging
     printf("Buffer length: %d\n", length);
-
-    // Search for start marker
+    
     for (uint16_t i = 0; i < length - strlen(START_MARKER) + 1; i++) {
         if (memcmp(buffer + i, START_MARKER, strlen(START_MARKER)) == 0) {
             uint16_t msgStart = i + strlen(START_MARKER);
-
-            // Search for end marker after start marker
             for (uint16_t j = msgStart; j < length - strlen(END_MARKER) + 1; j++) {
                 if (memcmp(buffer + j, END_MARKER, strlen(END_MARKER)) == 0) {
-                    printf("Message: ");
+                    printf("\nHex representation:\n");
                     for (uint16_t k = msgStart; k < j; k++) {
-                        printf("%c", buffer[k]);
+                        printf("%02X ", buffer[k]);
+                        if ((k - msgStart + 1) % 16 == 0) {
+                            printf("\n");
+                        }
+                    }
+                    
+                    printf("\n\nASCII representation:\n");
+                    for (uint16_t k = msgStart; k < j; k++) {
+                        if (isprint(buffer[k])) {  // If character is printable
+                            printf("%c", buffer[k]);
+                        } else {
+                            printf("."); // Print dot for non-printable characters
+                        }
+                        if ((k - msgStart + 1) % 16 == 0) {
+                            printf("\n");
+                        }
+                    }
+                    printf("\n\nSide by side (16 bytes per line):\n");
+                    for (uint16_t k = msgStart; k < j; k += 16) {
+                        // Print hex values
+                        for (uint16_t m = k; m < k + 16 && m < j; m++) {
+                            printf("%02X ", buffer[m]);
+                        }
+                        // Pad with spaces if less than 16 bytes
+                        for (uint16_t m = j; m < k + 16; m++) {
+                            printf("   ");
+                        }
+                        printf("   ");  // Separator between hex and ASCII
+                        
+                        // Print ASCII values
+                        for (uint16_t m = k; m < k + 16 && m < j; m++) {
+                            if (isprint(buffer[m])) {
+                                printf("%c", buffer[m]);
+                            } else {
+                                printf(".");
+                            }
+                        }
+                        printf("\n");
                     }
                     printf("\n");
-                    return;
+                    //return;
                 }
             }
         }
