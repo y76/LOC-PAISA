@@ -41,16 +41,18 @@ Next steps.
 #include "esp_http_client.h"
 #include "esp_tls.h"
 #include "esp_crt_bundle.h"
-
+#include "mbedtls/x509_crt.h"
+#include "mbedtls/pk.h"
+#include "mbedtls/base64.h"
 #define INSTANCE_ID 0
 
-#define EXAMPLE_ESP_WIFI_SSID      "THE BEST TP LINK"
-#define EXAMPLE_ESP_WIFI_PASS      "ZOTzot2023"
-#define EXAMPLE_ESP_MAXIMUM_RETRY  5
+#define EXAMPLE_ESP_WIFI_SSID "THE BEST TP LINK"
+#define EXAMPLE_ESP_WIFI_PASS "ZOTzot2023"
+#define EXAMPLE_ESP_MAXIMUM_RETRY 5
 
 static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT      BIT1
+#define WIFI_FAIL_BIT BIT1
 static int s_retry_num = 0;
 
 // Configure the maximum advertisement size
@@ -417,22 +419,30 @@ static bool contains_loc_paisa(const uint8_t *data)
     }
     return false;
 }
-static void event_handler(void* arg, esp_event_base_t event_base,
-                         int32_t event_id, void* event_data)
+static void event_handler(void *arg, esp_event_base_t event_base,
+                          int32_t event_id, void *event_data)
 {
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
+    {
         esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < EXAMPLE_ESP_MAXIMUM_RETRY) {
+    }
+    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
+    {
+        if (s_retry_num < EXAMPLE_ESP_MAXIMUM_RETRY)
+        {
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "retry to connect to the AP");
-        } else {
+        }
+        else
+        {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
-        ESP_LOGI(TAG,"connect to the AP fail");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAG, "connect to the AP fail");
+    }
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
@@ -453,15 +463,15 @@ void wifi_init_sta(void)
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                      ESP_EVENT_ANY_ID,
-                                                      &event_handler,
-                                                      NULL,
-                                                      &instance_any_id));
+                                                        ESP_EVENT_ANY_ID,
+                                                        &event_handler,
+                                                        NULL,
+                                                        &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
-                                                      IP_EVENT_STA_GOT_IP,
-                                                      &event_handler,
-                                                      NULL,
-                                                      &instance_got_ip));
+                                                        IP_EVENT_STA_GOT_IP,
+                                                        &event_handler,
+                                                        NULL,
+                                                        &instance_got_ip));
 
     wifi_config_t wifi_config = {
         .sta = {
@@ -480,22 +490,26 @@ void wifi_init_sta(void)
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() */
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE,
-            pdFALSE,
-            portMAX_DELAY);
+                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+                                           pdFALSE,
+                                           pdFALSE,
+                                           portMAX_DELAY);
 
-    if (bits & WIFI_CONNECTED_BIT) {
+    if (bits & WIFI_CONNECTED_BIT)
+    {
         ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
                  EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
-    } else if (bits & WIFI_FAIL_BIT) {
+    }
+    else if (bits & WIFI_FAIL_BIT)
+    {
         ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
                  EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
 }
-
 
 // Add this global buffer to store the complete response
 static char response_buffer[4096];
@@ -507,7 +521,8 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
     {
     case HTTP_EVENT_ON_HEADER:
         // Reset buffer at the start of a new request
-        if (evt->header_key != NULL) {
+        if (evt->header_key != NULL)
+        {
             response_len = 0;
             memset(response_buffer, 0, sizeof(response_buffer));
         }
@@ -515,16 +530,18 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 
     case HTTP_EVENT_ON_DATA:
         // Prevent buffer overflow and duplicates
-        if (response_len + evt->data_len < sizeof(response_buffer)) {
+        if (response_len + evt->data_len < sizeof(response_buffer))
+        {
             memcpy(response_buffer + response_len, evt->data, evt->data_len);
             response_len += evt->data_len;
-            response_buffer[response_len] = 0;  // Null terminate
+            response_buffer[response_len] = 0; // Null terminate
         }
         break;
 
     case HTTP_EVENT_ON_FINISH:
         // Ensure buffer is null-terminated
-        if (response_len < sizeof(response_buffer)) {
+        if (response_len < sizeof(response_buffer))
+        {
             response_buffer[response_len] = 0;
         }
         break;
@@ -540,12 +557,105 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
     }
     return ESP_OK;
 }
+#define CERT_BUFFER_SIZE 2048 // Adjust if needed
+static char certificate_of_device[CERT_BUFFER_SIZE] = {0};
+// Buffer to store the extracted public key
+#define PUBKEY_BUFFER_SIZE 1024
+static char public_key[PUBKEY_BUFFER_SIZE] = {0};
 
-void display_paisa_info(const char* url) {
+void fix_certificate_format(const char *src_cert, char *fixed_cert, size_t fixed_cert_size)
+{
+    const char *src = src_cert;
+    char *dst = fixed_cert;
+
+    while (*src)
+    {
+        if (*src == '\\' && *(src + 1) == 'n')
+        {
+            if (dst - fixed_cert < fixed_cert_size - 1) // Make sure we don't overflow the buffer
+            {
+                *dst = '\n'; // Replace "\n" with actual newline
+                dst++;
+            }
+            src += 2; // Skip over the escaped characters
+        }
+        else
+        {
+            if (dst - fixed_cert < fixed_cert_size - 1) // Prevent buffer overflow
+            {
+                *dst = *src;
+                dst++;
+            }
+            src++;
+        }
+    }
+
+    *dst = '\0'; // Ensure null termination
+}
+
+#define CERT_SIZE 2048 // Make sure this size is sufficient for your certificate
+
+void extract_public_key()
+{
+    if (strlen(certificate_of_device) == 0)
+    {
+        ESP_LOGI(TAG, "Certificate is empty, cannot extract public key!");
+        return;
+    }
+
+    // Fix certificate format (if necessary)
+    char fixed_cert[CERT_SIZE];
+
+    fix_certificate_format(certificate_of_device, fixed_cert, CERT_SIZE);
+
+    mbedtls_x509_crt cert;
+    mbedtls_x509_crt_init(&cert);
+
+    // Parse the certificate from the PEM string
+    int ret = mbedtls_x509_crt_parse(&cert, (const unsigned char *)fixed_cert, strlen(fixed_cert) + 1);
+    if (ret != 0)
+    {
+        ESP_LOGI(TAG, "Failed to parse certificate, error: -0x%X", -ret);
+        mbedtls_x509_crt_free(&cert);
+        return;
+    }
+
+    // Extract the public key
+    mbedtls_pk_context *pk = &cert.pk;
+    if (!mbedtls_pk_can_do(pk, MBEDTLS_PK_ECKEY))
+    {
+        ESP_LOGE(TAG, "Certificate does not contain an EC public key!");
+        mbedtls_x509_crt_free(&cert);
+        return;
+    }
+
+    // Convert the public key to PEM format
+    unsigned char buf[PUBKEY_BUFFER_SIZE]; // Ensure this is large enough
+    size_t olen = 0;
+    ret = mbedtls_pk_write_pubkey_pem(pk, buf, PUBKEY_BUFFER_SIZE);
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to write public key in PEM format, error: -0x%X", -ret);
+        mbedtls_x509_crt_free(&cert);
+        return;
+    }
+
+    // Ensure the public key buffer is large enough and copy the public key to global buffer
+    strncpy(public_key, (const char *)buf, PUBKEY_BUFFER_SIZE - 1);
+    public_key[PUBKEY_BUFFER_SIZE - 1] = '\0'; // Null terminate the string
+
+    ESP_LOGI(TAG, "Extracted Public Key:\n%s", public_key);
+
+    // Clean up
+    mbedtls_x509_crt_free(&cert);
+}
+
+void display_paisa_info(const char *url)
+{
     ESP_LOGI(TAG, "Device URL: %s", url);
-    
+
     esp_http_client_config_t config = {
-        .host ="bit.ly",
+        .host = "bit.ly",
         .path = "/3HnHwEu",
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .cert_pem = NULL,
@@ -555,27 +665,65 @@ void display_paisa_info(const char* url) {
         .user_agent = "Mozilla/5.0",
         .event_handler = http_event_handler,
     };
-    
+
     esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (client == NULL) {
+    if (client == NULL)
+    {
         ESP_LOGE(TAG, "Failed to initialize HTTP client");
         return;
     }
 
     esp_err_t err = esp_http_client_perform(client);
-    if (err == ESP_OK) {
+    if (err == ESP_OK)
+    {
         int status = esp_http_client_get_status_code(client);
         ESP_LOGI(TAG, "HTTP Status = %d", status);
-        
-        // Simply print the raw response buffer
+
         ESP_LOGI(TAG, "Actual Response Length: %d bytes", response_len);
         ESP_LOGI(TAG, "RAW MESSAGE: %.*s", response_len, response_buffer);
-    } else {
+
+        // Extract the certificate from the response
+        const char *cert_start = strstr(response_buffer, "certificate_of_device:");
+        if (cert_start != NULL)
+        {
+            cert_start += strlen("certificate_of_device:");
+
+            const char *cert_end = strstr(cert_start, "-----END CERTIFICATE-----");
+            if (cert_end != NULL)
+            {
+                size_t cert_length = cert_end - cert_start + strlen("-----END CERTIFICATE-----");
+
+                // Ensure we do not exceed the buffer size
+                if (cert_length < CERT_BUFFER_SIZE - 1)
+                {
+                    strncpy(certificate_of_device, cert_start, cert_length);
+                    certificate_of_device[cert_length] = '\0'; // Null-terminate
+
+                    ESP_LOGI(TAG, "Certificate stored successfully!");
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "Certificate too large for buffer!");
+                }
+            }
+            else
+            {
+                ESP_LOGE(TAG, "Certificate end not found");
+            }
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Certificate of device not found in response");
+        }
+    }
+    else
+    {
         ESP_LOGE(TAG, "HTTP request failed: %s", esp_err_to_name(err));
     }
 
     esp_http_client_cleanup(client);
 }
+
 // Helper function to extract URL from BLE announcement
 static void extract_and_display_url(const uint8_t *data, uint8_t length)
 {
@@ -609,85 +757,102 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
         const struct ble_gap_disc_desc *disc = &event->disc;
         struct ble_gap_disc_desc_debug *debug_disc = (struct ble_gap_disc_desc_debug *)disc;
 
-        if (debug_disc->data != NULL)
+        if (debug_disc->data != NULL && debug_disc->data[4] == 0xFF && contains_loc_paisa(debug_disc->data))
         {
-            // Check for manufacturer specific data type (0xFF) and our marker
-            if (debug_disc->data[4] == 0xFF && contains_loc_paisa(debug_disc->data))
+            ESP_LOGI(TAG, "Found LOC-PAISA advertisement");
+
+            uint8_t total_length = debug_disc->data[3];
+            ESP_LOGI(TAG, "Processing advertisement with length: %d", total_length);
+            print_adv_data(debug_disc->data, total_length);
+
+            // Log the sender's address
+            char addr_str[18];
+            snprintf(addr_str, sizeof(addr_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+                     disc->addr.val[5], disc->addr.val[4], disc->addr.val[3],
+                     disc->addr.val[2], disc->addr.val[1], disc->addr.val[0]);
+            ESP_LOGI(TAG, "Sender address: %s", addr_str);
+
+            // TODO
+            // CHECK TIMESTAMP FRESHNESS
+
+            // TODO
+            // VERIFY MANIFEST IDEV SIGNATURE USIGN PKMSR
+
+            // TODO
+            // VERIFY MSGANNO SIGNATURE USING PKIDEV
+
+            // PRINT OUT PAISA INFORMATION
+            extract_and_display_url(debug_disc->data, total_length);
+
+            if (strlen(certificate_of_device) > 0)
             {
-                ESP_LOGI(TAG, "Found LOC-PAISA advertisement");
+                ESP_LOGI(TAG, "Using extracted certificate...");
+                extract_public_key();
 
-                // First byte of manufacturer data contains the total length
-                uint8_t total_length = debug_disc->data[3];
-                ESP_LOGI(TAG, "Processing advertisement with length: %d", total_length);
-                print_adv_data(debug_disc->data, total_length);
+                if (strlen(public_key) > 0)
+                {
+                    ESP_LOGI(TAG, "Extracted Public Key:\n%s", public_key);
+                    //public key successfully extracted, now just need to encrypt
 
-                // Log the sender's address
-                char addr_str[18];
-                snprintf(addr_str, sizeof(addr_str), "%02x:%02x:%02x:%02x:%02x:%02x",
-                         disc->addr.val[5], disc->addr.val[4], disc->addr.val[3],
-                         disc->addr.val[2], disc->addr.val[1], disc->addr.val[0]);
-                ESP_LOGI(TAG, "Sender address: %s", addr_str);
+                    // Temporarily stop scanning while we send our response
+                    ble_gap_disc_cancel();
 
-                // TODO
-                // VERIFY MANIFEST IDEV SIGNATURE USIGN PKMSR
+                    // Generate STS Key
+                    sts_key_t sts_key;
+                    sts_iv_t sts_iv;
 
-                // TODO
-                // VERIFY MSGANNO SIGNATURE USING PKIDEV
+                    // Generate random values for key and IV using ESP32's hardware RNG
+                    // esp_fill_random(&sts_key, sizeof(sts_key));
+                    // esp_fill_random(&sts_iv, sizeof(sts_iv));
 
-                // PRINT OUT PAISA INFORMATION
-                extract_and_display_url(debug_disc->data, total_length);
+                    // for now, use generic hardcoded values for development
+                    const char *key_string = "HELLOP@ISA2024"; // 13 chars
+                    const char *iv_string = "PAISA@HELLO2024"; // 13 chars
 
-                // Temporarily stop scanning while we send our response
-                ble_gap_disc_cancel();
+                    // Convert strings to key values (4 bytes per value)
+                    sts_key.key0 = *((uint32_t *)&key_string[0]); // HELL
+                    sts_key.key1 = *((uint32_t *)&key_string[4]); // OP@I
+                    sts_key.key2 = *((uint32_t *)&key_string[8]); // SA20
+                    sts_key.key3 = *((uint32_t *)&key_string[9]); // A202
 
-                // Generate STS Key
-                sts_key_t sts_key;
-                sts_iv_t sts_iv;
+                    sts_iv.iv0 = *((uint32_t *)&iv_string[0]); // PAIS
+                    sts_iv.iv1 = *((uint32_t *)&iv_string[4]); // A@HE
+                    sts_iv.iv2 = *((uint32_t *)&iv_string[8]); // LLO2
+                    sts_iv.iv3 = *((uint32_t *)&iv_string[9]); // O202
 
-                // Generate random values for key and IV using ESP32's hardware RNG
-                // esp_fill_random(&sts_key, sizeof(sts_key));
-                // esp_fill_random(&sts_iv, sizeof(sts_iv));
+                    ESP_LOGI(TAG, "STS KEY: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
+                             sts_key.key0, sts_key.key1, sts_key.key2, sts_key.key3);
 
-                // for now, use generic hardcoded values for development
-                // sts_key = { 0x14EB220F, 0xF86050A8, 0xD1D336AA, 0x14148674 };
+                    ESP_LOGI(TAG, "STS IV: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
+                             sts_iv.iv0, sts_iv.iv1, sts_iv.iv2, sts_iv.iv3);
 
-                // sts_iv = { 0x1F9A3DE4, 0xD37EC3CA, 0xC44FA8FB, 0x362EEB34 };
+                    // Send Announcement data over to UWB board.
+                    send_uart_data(debug_disc->data, total_length);
 
-                const char *key_string = "HELLOP@ISA2024"; // 13 chars
-                const char *iv_string = "PAISA@HELLO2024"; // 13 chars
+                    // Create and send STS data over UART
+                    uint8_t sts_data[32];
+                    memcpy(sts_data, &sts_key, sizeof(sts_key));
+                    memcpy(sts_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
+                    send_uart_data(sts_data, sizeof(sts_data));
 
-                // Convert strings to key values (4 bytes per value)
-                sts_key.key0 = *((uint32_t *)&key_string[0]); // HELL
-                sts_key.key1 = *((uint32_t *)&key_string[4]); // OP@I
-                sts_key.key2 = *((uint32_t *)&key_string[8]); // SA20
-                sts_key.key3 = *((uint32_t *)&key_string[9]); // A202
+                    // TODO
+                    // USE EXTRACTED PUBLIC KEY TO ENCRYPT STS INFORMATION
+                    // SEND ENCRYPTED MESSAGE OVER BLE
+                    // Send LOC-RESP
+                    send_loc_resp();
 
-                sts_iv.iv0 = *((uint32_t *)&iv_string[0]); // PAIS
-                sts_iv.iv1 = *((uint32_t *)&iv_string[4]); // A@HE
-                sts_iv.iv2 = *((uint32_t *)&iv_string[8]); // LLO2
-                sts_iv.iv3 = *((uint32_t *)&iv_string[9]); // O202
-
-                ESP_LOGI(TAG, "STS KEY: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
-                         sts_key.key0, sts_key.key1, sts_key.key2, sts_key.key3);
-
-                ESP_LOGI(TAG, "STS IV: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
-                         sts_iv.iv0, sts_iv.iv1, sts_iv.iv2, sts_iv.iv3);
-
-                // Send Announcement data over to UWB board.
-                send_uart_data(debug_disc->data, total_length);
-
-                // Create and send STS data over UART
-                uint8_t sts_data[32];
-                memcpy(sts_data, &sts_key, sizeof(sts_key));
-                memcpy(sts_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
-                send_uart_data(sts_data, sizeof(sts_data));
-
-                // Send LOC-RESP
-                send_loc_resp();
-
-                // Restart scanning after a short delay
-                vTaskDelay(pdMS_TO_TICKS(1000));
-                ble_scanner_init();
+                    // Restart scanning after a short delay
+                    vTaskDelay(pdMS_TO_TICKS(1000));
+                    ble_scanner_init();
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "Failed to extract public key!");
+                }
+            }
+            else
+            {
+                ESP_LOGE(TAG, "Certificate not available!");
             }
         }
         break;
@@ -746,9 +911,9 @@ void app_main(void)
 
     uart_init();
 
-    //ESP_ERROR_CHECK(nvs_flash_init());
+    // ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
-    //ESP_ERROR_CHECK(esp_event_loop_create_default());
+    // ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init_sta();
 
     // Initialize the NimBLE stack
