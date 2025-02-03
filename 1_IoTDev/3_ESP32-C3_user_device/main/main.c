@@ -44,6 +44,10 @@ Next steps.
 #include "mbedtls/x509_crt.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/base64.h"
+#include "mbedtls/error.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
+
 #define INSTANCE_ID 0
 
 #define EXAMPLE_ESP_WIFI_SSID "THE BEST TP LINK"
@@ -748,6 +752,63 @@ static void extract_and_display_url(const uint8_t *data, uint8_t length)
     }
 }
 
+static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
+                                   const char *public_key,
+                                   uint8_t *encrypted_data, size_t *encrypted_len)
+{
+    mbedtls_pk_context pk;
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    const char *pers = "encrypt_with_public_key";
+    int ret = 0;
+
+    mbedtls_pk_init(&pk);
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+
+    do
+    {
+        ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
+                                    (const unsigned char *)pers, strlen(pers));
+        if (ret != 0)
+        {
+            ESP_LOGE(TAG, "Failed to seed CTR_DRBG: -0x%x", -ret);
+            break;
+        }
+
+        ESP_LOGI(TAG, "Parsing public key of length %d", strlen(public_key));
+        ret = mbedtls_pk_parse_public_key(&pk, (const unsigned char *)public_key, strlen(public_key) + 1);
+        if (ret != 0)
+        {
+            ESP_LOGE(TAG, "Failed to parse public key: -0x%x", -ret);
+            break;
+        }
+
+        ESP_LOGI(TAG, "Encrypting data of length %d", data_len);
+        ret = mbedtls_pk_encrypt(&pk, data, data_len,
+                                 encrypted_data, encrypted_len,
+                                 *encrypted_len,
+                                 mbedtls_ctr_drbg_random, &ctr_drbg);
+
+        if (ret != 0)
+        {
+            ESP_LOGE(TAG, "Failed to encrypt data: -0x%x", -ret);
+            char error_buf[100];
+            mbedtls_strerror(ret, error_buf, 100);
+            ESP_LOGE(TAG, "Error details: %s", error_buf);
+        }
+        else
+        {
+            ESP_LOGI(TAG, "Data encrypted successfully. Encrypted length: %d", *encrypted_len);
+        }
+    } while (0);
+
+    mbedtls_pk_free(&pk);
+    mbedtls_entropy_free(&entropy);
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+
+    return ret;
+}
 static int ble_gap_event(struct ble_gap_event *event, void *arg)
 {
     switch (event->type)
@@ -792,7 +853,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 if (strlen(public_key) > 0)
                 {
                     ESP_LOGI(TAG, "Extracted Public Key:\n%s", public_key);
-                    //public key successfully extracted, now just need to encrypt
+                    // public key successfully extracted, now just need to encrypt
 
                     // Temporarily stop scanning while we send our response
                     ble_gap_disc_cancel();
@@ -835,15 +896,37 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                     memcpy(sts_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
                     send_uart_data(sts_data, sizeof(sts_data));
 
-                    // TODO
-                    // USE EXTRACTED PUBLIC KEY TO ENCRYPT STS INFORMATION
-                    // SEND ENCRYPTED MESSAGE OVER BLE
-                    // Send LOC-RESP
+                    uint8_t encrypted_sts_data[256]; // Adjust size as needed
+                    size_t encrypted_length = sizeof(encrypted_sts_data);
+
+                    ESP_LOGI(TAG, "Public key (length %d):\n%s", strlen(public_key), public_key);
+                    ESP_LOGI(TAG, "STS data length: %d", sizeof(sts_data));
+                    ESP_LOG_BUFFER_HEX(TAG, sts_data, sizeof(sts_data));
+
+                    int ret = encrypt_with_public_key(sts_data, sizeof(sts_data),
+                                                      public_key,
+                                                      encrypted_sts_data, &encrypted_length);
+                    // if (ret == 0)
+                    // {
                     send_loc_resp();
 
                     // Restart scanning after a short delay
                     vTaskDelay(pdMS_TO_TICKS(1000));
                     ble_scanner_init();
+                    // }
+                    //  else
+                    //  {
+                    //      ESP_LOGE(TAG, "Failed to encrypt STS data, not sending LOC-RESP");
+                    //   }
+                    // TODO
+                    // USE EXTRACTED PUBLIC KEY TO ENCRYPT STS INFORMATION
+                    // SEND ENCRYPTED MESSAGE OVER BLE
+                    // Send LOC-RESP
+                    // send_loc_resp();
+
+                    // Restart scanning after a short delay
+                    // vTaskDelay(pdMS_TO_TICKS(1000));
+                    //  ble_scanner_init();
                 }
                 else
                 {
