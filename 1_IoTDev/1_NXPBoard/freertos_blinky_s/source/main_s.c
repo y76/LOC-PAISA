@@ -285,8 +285,12 @@ void findMessage(const uint8_t* buffer, uint16_t length) {
 
 void WIFI_USART_IRQHandler(void)
 {
-    // If new data arrived
-    while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART))
+    // Prevent infinite processing
+    uint16_t safety_counter = 0;
+    const uint16_t MAX_ITERATIONS = 100;  // Prevent infinite loop
+
+    while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART) &&
+           safety_counter++ < MAX_ITERATIONS)
     {
         // Read the byte
         uint8_t receivedByte = USART_ReadByte(WIFI_USART);
@@ -297,9 +301,9 @@ void WIFI_USART_IRQHandler(void)
             rxBuffer[bufferIndex++] = receivedByte;
 
             // Check if we have an end marker
-            if (bufferIndex >= strlen(END_MARKER) &&
-                memcmp(&rxBuffer[bufferIndex - strlen(END_MARKER)],
-                      END_MARKER, strlen(END_MARKER)) == 0)
+            if (bufferIndex >= END_MARKER_LENGTH &&
+                memcmp(&rxBuffer[bufferIndex - END_MARKER_LENGTH],
+                       END_MARKER, END_MARKER_LENGTH) == 0)
             {
                 // We have a complete message, process it
                 findMessage(rxBuffer, bufferIndex);
@@ -314,11 +318,16 @@ void WIFI_USART_IRQHandler(void)
         }
     }
 
+    // If safety counter was hit, force buffer reset
+    if (safety_counter >= MAX_ITERATIONS) {
+        bufferIndex = 0;
+        PRINTF("USART Interrupt: Maximum iterations reached. Potential communication issue.\r\n");
+    }
+
     // Clear any receive errors
     USART_ClearStatusFlags(WIFI_USART, kUSART_RxError);
     SDK_ISR_EXIT_BARRIER;
 }
-
 
 void WIFI_USART2_IRQHandler(void)
 {
