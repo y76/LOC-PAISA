@@ -609,7 +609,6 @@ void extract_public_key()
 
     // Fix certificate format (if necessary)
     char fixed_cert[CERT_SIZE];
-
     fix_certificate_format(certificate_of_device, fixed_cert, CERT_SIZE);
 
     mbedtls_x509_crt cert;
@@ -626,9 +625,11 @@ void extract_public_key()
 
     // Extract the public key
     mbedtls_pk_context *pk = &cert.pk;
-    if (!mbedtls_pk_can_do(pk, MBEDTLS_PK_ECKEY))
+    
+    // Check if it's an RSA key instead of EC
+    if (!mbedtls_pk_can_do(pk, MBEDTLS_PK_RSA))
     {
-        ESP_LOGE(TAG, "Certificate does not contain an EC public key!");
+        ESP_LOGE(TAG, "Certificate does not contain an RSA public key!");
         mbedtls_x509_crt_free(&cert);
         return;
     }
@@ -648,7 +649,7 @@ void extract_public_key()
     strncpy(public_key, (const char *)buf, PUBKEY_BUFFER_SIZE - 1);
     public_key[PUBKEY_BUFFER_SIZE - 1] = '\0'; // Null terminate the string
 
-    ESP_LOGI(TAG, "Extracted Public Key:\n%s", public_key);
+    ESP_LOGI(TAG, "Extracted RSA Public Key:\n%s", public_key);
 
     // Clean up
     mbedtls_x509_crt_free(&cert);
@@ -660,7 +661,8 @@ void display_paisa_info(const char *url)
 
     esp_http_client_config_t config = {
         .host = "bit.ly",
-        .path = "/3HnHwEu",
+        //.path = "/3HnHwEu",
+        .path = "/4glPu0g",
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .cert_pem = NULL,
         .skip_cert_common_name_check = true,
@@ -927,6 +929,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                     // Restart scanning after a short delay
                     // vTaskDelay(pdMS_TO_TICKS(1000));
                     //  ble_scanner_init();
+                    //http://bit.ly/4glPu0g
                 }
                 else
                 {
