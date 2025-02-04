@@ -1,4 +1,5 @@
 #!/bin/bash
+# key: secp256r1 == prime256v1
 
 dev_dir=dev
 ttp_dir=ttp
@@ -6,57 +7,81 @@ dev_crt_conf=dev_crt.cnf
 dev_csr_conf=dev_csr.cnf
 ttp_crt_conf=ttp_crt.cnf
 
-# Clean up existing directories
-rm -rf rsa2048
-rm -rf rsa3072
-rm -rf rsa4096
+# Execute the following commands
+rm -rf $secp256_dir
+rm -rf $secp384_dir
+rm -rf $secp521_dir
 
 if [ $# -gt 0 ]
 then
-    # Check if certificates generation successfully done
-    if [ ! -d "rsa2048" ] || [ ! -d "rsa3072" ] || [ ! -d "rsa4096" ]; then
-        echo "[Usage] generate_key_and_crt.sh"
-        exit 1
-    fi
-    for key_size in 2048 3072 4096
-    do
-        echo "================================ [${key_size}] Certificate of TTP ================================"
-        openssl x509 -noout -text -in rsa${key_size}/$ttp_dir/crt.pem
-
-        echo "================================ [${key_size}] CSR of Device ================================"
-        openssl req -noout -text -in rsa${key_size}/$dev_dir/csr.pem
-
-        echo "================================ [${key_size}] Certificate of Device ================================"
-        openssl x509 -noout -text -in rsa${key_size}/$dev_dir/crt.pem
-    done
-    exit 0
+        # Check if certificates generation successfully done
+        if [ ! -d "secp256r1" ] || [ ! -d "secp256r1" ] || [ ! -d "secp256r1" ]; then
+                echo "[Usage] generate_key_and_crt.sh"
+                exit 1
+        fi
+        for key_size in 256 384 521
+        do
+                echo "================================ [${key_size}] Certificate of TTP ================================"
+                openssl x509 -noout -text -in secp${key_size}r1/$ttp_dir/crt.pem
+                echo "================================ [${key_size}] CSR of Device ================================"
+                openssl req -noout -text -in secp${key_size}r1/$dev_dir/csr.pem
+                echo "================================ [${key_size}] Certificate of Device ================================"
+                openssl x509 -noout -text -in secp${key_size}r1/$dev_dir/crt.pem
+                echo "================================ [${key_size}] CSR of Device (Second Key) ================================"
+                openssl req -noout -text -in secp${key_size}r1/$dev_dir/csr_2.pem
+                echo "================================ [${key_size}] Certificate of Device (Second Key) ================================"
+                openssl x509 -noout -text -in secp${key_size}r1/$dev_dir/crt_2.pem
+        done
+        exit 0
 fi
 
-for key_size in 2048 3072 4096
+for key_size in 256 384 521
 do
-    mkdir -p rsa${key_size}/$dev_dir
-    mkdir -p rsa${key_size}/$ttp_dir
-    cp $dev_crt_conf rsa${key_size}/
-    cp $dev_csr_conf rsa${key_size}/
-    cp $ttp_crt_conf rsa${key_size}/
+        mkdir -p secp${key_size}r1/$dev_dir
+        mkdir -p secp${key_size}r1/$ttp_dir
+        cp $dev_crt_conf secp${key_size}r1/
+        cp $dev_csr_conf secp${key_size}r1/
+        cp $ttp_crt_conf secp${key_size}r1/
 
-    # Update key size in config files if needed
-    sed -i "s/default_bits = .*/default_bits = ${key_size}/g" rsa${key_size}/$dev_crt_conf
-    sed -i "s/default_bits = .*/default_bits = ${key_size}/g" rsa${key_size}/$dev_csr_conf
-    sed -i "s/default_bits = .*/default_bits = ${key_size}/g" rsa${key_size}/$ttp_crt_conf
+        if [ "$key_size" != "256" ]; then
+                sed -i "s/prime256v1/secp${key_size}r1/g" secp${key_size}r1/$dev_crt_conf
+                sed -i "s/256/${key_size}/g" secp${key_size}r1/$dev_crt_conf
+                sed -i "s/prime256v1/secp${key_size}r1/g" secp${key_size}r1/$dev_csr_conf
+                sed -i "s/256/${key_size}/g" secp${key_size}r1/$dev_csr_conf
+                sed -i "s/prime256v1/secp${key_size}r1/g" secp${key_size}r1/$ttp_crt_conf
+                sed -i "s/256/${key_size}/g" secp${key_size}r1/$ttp_crt_conf
+        fi
 
-    # Dev side
-    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:${key_size} -out rsa${key_size}/$dev_dir/key.pem
-    openssl rsa -in rsa${key_size}/$dev_dir/key.pem -pubout > rsa${key_size}/$dev_dir/pub.pem
-    openssl req -new -key rsa${key_size}/$dev_dir/key.pem -out rsa${key_size}/$dev_dir/csr.pem -config dev_csr.cnf
+        # Dev side - First key pair
+        if [ "$key_size" == "256" ]; then
+                openssl ecparam -name prime256v1 -genkey -param_enc named_curve -out secp${key_size}r1/$dev_dir/key.pem
+        else
+                openssl ecparam -name secp${key_size}r1 -genkey -param_enc named_curve -out secp${key_size}r1/$dev_dir/key.pem
+        fi
+        openssl ec -in secp${key_size}r1/$dev_dir/key.pem -pubout -param_enc named_curve > secp${key_size}r1/$dev_dir/pub.pem
+        openssl req -new -key secp${key_size}r1/$dev_dir/key.pem -out secp${key_size}r1/$dev_dir/csr.pem -config dev_csr.cnf
 
-    # TTP side
-    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:${key_size} -out rsa${key_size}/$ttp_dir/key.pem
-    openssl rsa -in rsa${key_size}/$ttp_dir/key.pem -pubout > rsa${key_size}/$ttp_dir/pub.pem
-    openssl req -x509 -new -key rsa${key_size}/$ttp_dir/key.pem -out rsa${key_size}/$ttp_dir/crt.pem -days 365 -config ttp_crt.cnf
+        # Dev side - Second key pair
+        if [ "$key_size" == "256" ]; then
+                openssl ecparam -name prime256v1 -genkey -param_enc named_curve -out secp${key_size}r1/$dev_dir/key_2.pem
+        else
+                openssl ecparam -name secp${key_size}r1 -genkey -param_enc named_curve -out secp${key_size}r1/$dev_dir/key_2.pem
+        fi
+        openssl ec -in secp${key_size}r1/$dev_dir/key_2.pem -pubout -param_enc named_curve > secp${key_size}r1/$dev_dir/pub_2.pem
+        openssl req -new -key secp${key_size}r1/$dev_dir/key_2.pem -out secp${key_size}r1/$dev_dir/csr_2.pem -config dev_csr.cnf
 
-    # Sign device certificate
-    openssl x509 -req -in rsa${key_size}/$dev_dir/csr.pem -out rsa${key_size}/$dev_dir/crt.pem -days 365 \
-        -CA rsa${key_size}/$ttp_dir/crt.pem -CAkey rsa${key_size}/$ttp_dir/key.pem -CAcreateserial \
-        -extensions req_ext -extfile dev_crt.cnf
+        # TTP side
+        if [ "$key_size" == "256" ]; then
+                openssl ecparam -name prime256v1 -genkey -out secp${key_size}r1/$ttp_dir/key.pem
+        else
+                openssl ecparam -name secp${key_size}r1 -genkey -out secp${key_size}r1/$ttp_dir/key.pem
+        fi
+        openssl ec -in secp${key_size}r1/$ttp_dir/key.pem -pubout > secp${key_size}r1/$ttp_dir/pub.pem
+        openssl req -x509 -new -key secp${key_size}r1/$ttp_dir/key.pem -out secp${key_size}r1/$ttp_dir/crt.pem -days 365 -config ttp_crt.cnf
+
+        # Sign first device CSR
+        openssl x509 -req -in secp${key_size}r1/$dev_dir/csr.pem -out secp${key_size}r1/$dev_dir/crt.pem -days 365 -CA secp${key_size}r1/$ttp_dir/crt.pem -CAkey secp${key_size}r1/$ttp_dir/key.pem -CAcreateserial -extensions req_ext -extfile dev_crt.cnf
+
+        # Sign second device CSR
+        openssl x509 -req -in secp${key_size}r1/$dev_dir/csr_2.pem -out secp${key_size}r1/$dev_dir/crt_2.pem -days 365 -CA secp${key_size}r1/$ttp_dir/crt.pem -CAkey secp${key_size}r1/$ttp_dir/key.pem -CAcreateserial -extensions req_ext -extfile dev_crt.cnf
 done

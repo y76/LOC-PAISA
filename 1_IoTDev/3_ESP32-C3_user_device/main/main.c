@@ -50,8 +50,8 @@ Next steps.
 
 #define INSTANCE_ID 0
 
-#define EXAMPLE_ESP_WIFI_SSID "THE BEST TP LINK"
-#define EXAMPLE_ESP_WIFI_PASS "ZOTzot2023"
+#define EXAMPLE_ESP_WIFI_SSID "sprout-new"
+#define EXAMPLE_ESP_WIFI_PASS "youknowwho6"
 #define EXAMPLE_ESP_MAXIMUM_RETRY 5
 
 static EventGroupHandle_t s_wifi_event_group;
@@ -662,7 +662,9 @@ void display_paisa_info(const char *url)
     esp_http_client_config_t config = {
         .host = "bit.ly",
         //.path = "/3HnHwEu",
-        .path = "/4glPu0g",
+        //.path = "/4glPu0g",
+        //.path = "/4hAjeaU",
+        .path = "/430XMb1",
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .cert_pem = NULL,
         .skip_cert_common_name_check = true,
