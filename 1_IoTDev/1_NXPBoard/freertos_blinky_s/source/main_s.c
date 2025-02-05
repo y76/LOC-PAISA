@@ -310,6 +310,10 @@ void WIFI_USART_IRQHandler(void)
             {
                 // We have a complete message, process it
                 findMessage(rxBuffer, bufferIndex);
+
+                // Forward complete message to UART2
+                USART_WriteBlocking(WIFI_USART2, rxBuffer, bufferIndex);
+
                 // Reset buffer after processing
                 bufferIndex = 0;
             }
