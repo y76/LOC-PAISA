@@ -50,8 +50,8 @@ Next steps.
 
 #define INSTANCE_ID 0
 
-#define EXAMPLE_ESP_WIFI_SSID "sprout-new"
-#define EXAMPLE_ESP_WIFI_PASS "youknowwho6"
+#define EXAMPLE_ESP_WIFI_SSID "THE BEST TP LINK"
+#define EXAMPLE_ESP_WIFI_PASS "ZOTzot2023"
 #define EXAMPLE_ESP_MAXIMUM_RETRY 5
 
 static EventGroupHandle_t s_wifi_event_group;
@@ -91,6 +91,18 @@ typedef struct
     uint32_t iv2;
     uint32_t iv3;
 } sts_iv_t;
+
+typedef struct
+{
+    uint32_t key0;
+    uint32_t key1;
+    uint32_t key2;
+    uint32_t key3;
+    uint32_t key4;
+    uint32_t key5;
+    uint32_t key6;
+    uint32_t key7;
+} aes_key_t;
 
 static const char *TAG = "BLE_RECEIVER";
 static int ble_gap_event(struct ble_gap_event *event, void *arg);
@@ -232,6 +244,78 @@ static void ext_adv_init(void)
     rc = ble_gap_ext_adv_configure(INSTANCE_ID, &params, NULL,
                                    ble_gap_event, NULL);
     assert(rc == 0);
+}
+
+
+static void send_ble_message(uint8_t *data, size_t data_len)
+{
+    const char *prefix = "LOC-RESP";
+    size_t prefix_len = strlen(prefix);
+    size_t total_data_len = prefix_len + data_len;
+
+    // Calculate total advertisement length 
+    uint8_t total_adv_length = 3 + 2 + 2 + total_data_len; // Flags + header + company ID + prefix + data
+
+    uint8_t *adv_data = malloc(total_adv_length);
+    if (adv_data == NULL) {
+        ESP_LOGE(TAG, "Memory allocation failed!");
+        return;
+    }
+
+    // Standard flags
+    adv_data[0] = 0x02;
+    adv_data[1] = 0x01;
+    adv_data[2] = 0x06;
+
+    // Manufacturer specific data
+    adv_data[3] = total_data_len + 3;
+    adv_data[4] = 0xFF;
+    adv_data[5] = 0xE5;
+    adv_data[6] = 0x02;
+
+    // Add prefix and payload data
+    memcpy(&adv_data[7], prefix, prefix_len);
+    memcpy(&adv_data[7 + prefix_len], data, data_len);
+
+    // Rest of function same as before
+    struct os_mbuf *mbuf;
+    int rc;
+
+    if (ble_gap_ext_adv_active(INSTANCE_ID)) {
+        rc = ble_gap_ext_adv_stop(INSTANCE_ID);
+        assert(rc == 0);
+    }
+
+    mbuf = os_mbuf_get_pkthdr(&large_mbuf_pool, 0);
+    if (!mbuf) {
+        ESP_LOGE(TAG, "Failed to allocate mbuf!");
+        free(adv_data);
+        return;
+    }
+
+    rc = os_mbuf_append(mbuf, adv_data, total_adv_length);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "Failed to append to mbuf! rc=%d", rc);
+        free(adv_data);
+        return;
+    }
+
+    rc = ble_gap_ext_adv_set_data(INSTANCE_ID, mbuf);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "Failed to set advertisement data! rc=%d", rc);
+        free(adv_data);
+        return;
+    }
+
+    rc = ble_gap_ext_adv_start(INSTANCE_ID, 100, 0);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "Failed to start advertising! rc=%d", rc);
+        free(adv_data);
+        return;
+    }
+
+    free(adv_data);
+    ESP_LOGI(TAG, "BLE message sent (size: %d bytes)", total_data_len);
 }
 
 // Function to send LOC-RESP advertisement
@@ -625,7 +709,7 @@ void extract_public_key()
 
     // Extract the public key
     mbedtls_pk_context *pk = &cert.pk;
-    
+
     // Check if it's an RSA key instead of EC
     if (!mbedtls_pk_can_do(pk, MBEDTLS_PK_RSA))
     {
@@ -661,10 +745,10 @@ void display_paisa_info(const char *url)
 
     esp_http_client_config_t config = {
         .host = "bit.ly",
-        //.path = "/3HnHwEu",
+        .path = "/3HnHwEu",
         //.path = "/4glPu0g",
         //.path = "/4hAjeaU",
-        .path = "/430XMb1",
+        //.path = "/430XMb1",
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .cert_pem = NULL,
         .skip_cert_common_name_check = true,
@@ -848,95 +932,62 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
 
             // PRINT OUT PAISA INFORMATION
             extract_and_display_url(debug_disc->data, total_length);
-
+            // PRINT out the manifest + the announcement information (neatly)
             if (strlen(certificate_of_device) > 0)
             {
-                ESP_LOGI(TAG, "Using extracted certificate...");
-                extract_public_key();
 
-                if (strlen(public_key) > 0)
-                {
-                    ESP_LOGI(TAG, "Extracted Public Key:\n%s", public_key);
-                    // public key successfully extracted, now just need to encrypt
+                // Temporarily stop scanning while we send our response
+                ble_gap_disc_cancel();
 
-                    // Temporarily stop scanning while we send our response
-                    ble_gap_disc_cancel();
+                // Generate STS Key
+                sts_key_t sts_key;
+                sts_iv_t sts_iv;
 
-                    // Generate STS Key
-                    sts_key_t sts_key;
-                    sts_iv_t sts_iv;
+                // Generate random values for key and IV using ESP32's hardware RNG
+                // esp_fill_random(&sts_key, sizeof(sts_key));
+                // esp_fill_random(&sts_iv, sizeof(sts_iv));
 
-                    // Generate random values for key and IV using ESP32's hardware RNG
-                    // esp_fill_random(&sts_key, sizeof(sts_key));
-                    // esp_fill_random(&sts_iv, sizeof(sts_iv));
+                // for now, use generic hardcoded values for development
+                const char *key_string = "HELLOP@ISA2024"; // 13 chars
+                const char *iv_string = "PAISA@HELLO2024"; // 13 chars
 
-                    // for now, use generic hardcoded values for development
-                    const char *key_string = "HELLOP@ISA2024"; // 13 chars
-                    const char *iv_string = "PAISA@HELLO2024"; // 13 chars
+                // Convert strings to key values (4 bytes per value)
+                sts_key.key0 = *((uint32_t *)&key_string[0]); // HELL
+                sts_key.key1 = *((uint32_t *)&key_string[4]); // OP@I
+                sts_key.key2 = *((uint32_t *)&key_string[8]); // SA20
+                sts_key.key3 = *((uint32_t *)&key_string[9]); // A202
 
-                    // Convert strings to key values (4 bytes per value)
-                    sts_key.key0 = *((uint32_t *)&key_string[0]); // HELL
-                    sts_key.key1 = *((uint32_t *)&key_string[4]); // OP@I
-                    sts_key.key2 = *((uint32_t *)&key_string[8]); // SA20
-                    sts_key.key3 = *((uint32_t *)&key_string[9]); // A202
+                sts_iv.iv0 = *((uint32_t *)&iv_string[0]); // PAIS
+                sts_iv.iv1 = *((uint32_t *)&iv_string[4]); // A@HE
+                sts_iv.iv2 = *((uint32_t *)&iv_string[8]); // LLO2
+                sts_iv.iv3 = *((uint32_t *)&iv_string[9]); // O202
 
-                    sts_iv.iv0 = *((uint32_t *)&iv_string[0]); // PAIS
-                    sts_iv.iv1 = *((uint32_t *)&iv_string[4]); // A@HE
-                    sts_iv.iv2 = *((uint32_t *)&iv_string[8]); // LLO2
-                    sts_iv.iv3 = *((uint32_t *)&iv_string[9]); // O202
+                ESP_LOGI(TAG, "STS KEY: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
+                         sts_key.key0, sts_key.key1, sts_key.key2, sts_key.key3);
 
-                    ESP_LOGI(TAG, "STS KEY: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
-                             sts_key.key0, sts_key.key1, sts_key.key2, sts_key.key3);
+                ESP_LOGI(TAG, "STS IV: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
+                         sts_iv.iv0, sts_iv.iv1, sts_iv.iv2, sts_iv.iv3);
 
-                    ESP_LOGI(TAG, "STS IV: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
-                             sts_iv.iv0, sts_iv.iv1, sts_iv.iv2, sts_iv.iv3);
+                aes_key_t aes_key = {0x41424344, 0x45464748, 0x49505152, 0x53545556, 0x00000000, 0x00000000, 0x00000000, 0x00000000}; /*Initialize 128bits key (actually 256 but padded)*/
+                ESP_LOGI(TAG, "AES KEY: 0x%08lX 0x%08lX 0x%08lX 0x%08lX 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
+                         aes_key.key0, aes_key.key1, aes_key.key2, aes_key.key3,
+                         aes_key.key4, aes_key.key5, aes_key.key6, aes_key.key7);
 
-                    // Send Announcement data over to UWB board.
-                    send_uart_data(debug_disc->data, total_length);
+                // Send Announcement data over to UWB board.
+                send_uart_data(debug_disc->data, total_length);
 
-                    // Create and send STS data over UART
-                    uint8_t sts_data[32];
-                    memcpy(sts_data, &sts_key, sizeof(sts_key));
-                    memcpy(sts_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
-                    send_uart_data(sts_data, sizeof(sts_data));
+                // Create and send STS and AES data over UART
+                uint8_t crypto_data[64]; // Increased to hold both STS and AES data
+                memcpy(crypto_data, &sts_key, sizeof(sts_key));
+                memcpy(crypto_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
+                memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &aes_key, sizeof(aes_key));
+                send_uart_data(crypto_data, sizeof(crypto_data));
 
-                    uint8_t encrypted_sts_data[256]; // Adjust size as needed
-                    size_t encrypted_length = sizeof(encrypted_sts_data);
+               // send_loc_resp();
+                send_ble_message(crypto_data, sizeof(crypto_data));
 
-                    ESP_LOGI(TAG, "Public key (length %d):\n%s", strlen(public_key), public_key);
-                    ESP_LOGI(TAG, "STS data length: %d", sizeof(sts_data));
-                    ESP_LOG_BUFFER_HEX(TAG, sts_data, sizeof(sts_data));
-
-                    int ret = encrypt_with_public_key(sts_data, sizeof(sts_data),
-                                                      public_key,
-                                                      encrypted_sts_data, &encrypted_length);
-                    // if (ret == 0)
-                    // {
-                    send_loc_resp();
-
-                    // Restart scanning after a short delay
-                    vTaskDelay(pdMS_TO_TICKS(1000));
-                    ble_scanner_init();
-                    // }
-                    //  else
-                    //  {
-                    //      ESP_LOGE(TAG, "Failed to encrypt STS data, not sending LOC-RESP");
-                    //   }
-                    // TODO
-                    // USE EXTRACTED PUBLIC KEY TO ENCRYPT STS INFORMATION
-                    // SEND ENCRYPTED MESSAGE OVER BLE
-                    // Send LOC-RESP
-                    // send_loc_resp();
-
-                    // Restart scanning after a short delay
-                    // vTaskDelay(pdMS_TO_TICKS(1000));
-                    //  ble_scanner_init();
-                    //http://bit.ly/4glPu0g
-                }
-                else
-                {
-                    ESP_LOGE(TAG, "Failed to extract public key!");
-                }
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                ble_scanner_init();
             }
             else
             {
