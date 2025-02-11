@@ -35,7 +35,7 @@ extern "C"
 //#define TEST_RX_SNIFF
 //#define TEST_DOUBLE_BUFFER_RX
 //#define TEST_RX_TRIM
-//#define TEST_SIMPLE_RX_PDOA
+//#define TEST_SIMPLE_RX_PDOA     //this one
 //#define TEST_SIMPLE_RX_CIR
 
 //#define TEST_SIMPLE_TX_STS_SDC
@@ -52,25 +52,25 @@ extern "C"
 //#define TEST_CONTINUOUS_WAVE
 //#define TEST_CONTINUOUS_FRAME
 
-#define TEST_DS_TWR_INITIATOR_STS
+//#define TEST_DS_TWR_INITIATOR_STS
 //#define TEST_DS_TWR_RESPONDER_STS
 
 //#define TEST_DS_TWR_INITIATOR
 //#define TEST_DS_TWR_RESPONDER
 
 //#define TEST_DS_TWR_STS_SDC_INITIATOR
-//#define TEST_DS_TWR_STS_SDC_RESPONDER
+#define TEST_DS_TWR_STS_SDC_RESPONDER   //this one  - does both distance and PDOA
 
-//#define TEST_SS_TWR_INITIATOR
+//#define TEST_SS_TWR_INITIATOR  //this one
 //#define TEST_SS_TWR_RESPONDER
 
-//#define TEST_SS_TWR_INITIATOR_STS
+//#define TEST_SS_TWR_INITIATOR_STS //this one
 //#define TEST_SS_TWR_RESPONDER_STS
 
 //#define TEST_SS_TWR_INITIATOR_STS_NO_DATA
 //#define TEST_SS_TWR_RESPONDER_STS_NO_DATA
 
-//#define TEST_AES_SS_TWR_INITIATOR
+//#define TEST_AES_SS_TWR_INITIATOR    //this one
 //#define TEST_AES_SS_TWR_RESPONDER
 
 //#define TEST_ACK_DATA_TX

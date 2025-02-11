@@ -45,7 +45,7 @@ static dwt_config_t config = {
     (129 + 8 - 8),    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
     DWT_STS_MODE_OFF, /* STS disabled */
     DWT_STS_LEN_64,   /* STS length see allowed values in Enum dwt_sts_lengths_e */
-    DWT_PDOA_M0       /* PDOA mode off */
+    DWT_PDOA_M3       /* PDOA mode off */
 };
 
 /* Inter-ranging delay period, in milliseconds. */
@@ -54,6 +54,9 @@ static dwt_config_t config = {
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
 #define TX_ANT_DLY 16385
 #define RX_ANT_DLY 16385
+
+/* Define PI for PDOA calculations */
+#define PI 3.14159265358979f
 
 /* Frames used in the ranging process. See NOTE 2 below. */
 static uint8_t rx_poll_msg[] = { 0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x21, 0, 0 };
@@ -73,6 +76,11 @@ static uint8_t frame_seq_nb = 0;
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
 #define RX_BUF_LEN 24
 static uint8_t rx_buffer[RX_BUF_LEN];
+
+/* Add PDOA-related variables */
+static char dist_pdoa_str[80]; // Increased buffer for combined distance and PDOA output
+static int16_t pdoa_val = 0;
+static float pdoa_degrees = 0;
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
 static uint32_t status_reg = 0;
@@ -265,6 +273,15 @@ int ds_twr_responder(void)
                         /* Display computed distance on LCD. */
                         sprintf(dist_str, "DIST: %3.2f m", distance);
                         test_run_info((unsigned char *)dist_str);
+
+ pdoa_val = dwt_readpdoa();
+                pdoa_degrees = ((float)pdoa_val / (1<<11)) * 180 / PI;
+                    
+                    /* Display both distance and PDOA */
+                    snprintf(dist_pdoa_str, sizeof(dist_pdoa_str), 
+                            "DIST: %3.2f m, PDOA: %d (%3.1f deg)", 
+                            distance, pdoa_val, pdoa_degrees);
+                    test_run_info((unsigned char *)dist_pdoa_str);
 
                         /* as DS-TWR initiator is waiting for RNG_DELAY_MS before next poll transmission
                          * we can add a delay here before RX is re-enabled again

@@ -2,7 +2,6 @@
 <session>
  <Bookmarks/>
  <Breakpoints groups="Breakpoints" active_group="Breakpoints">
-  <BreakpointListItem trigger="" line="38" counter="0" hardwareBreakpoint="" isFunctionBreakpoint="false" action="" expression="" stopAll="false" group="Breakpoints" type="Breakpoint" state="2" filename="../../Src/examples/ex_01a_simple_tx/simple_tx.c" useHWbreakpoint="false"/>
   <Exceptions set="MemManage;UsageFault_Coprocessor;UsageFault_CheckingError;UsageFault_StateError;BusFault;ExceptionEntryReturnFault;HardFault"/>
  </Breakpoints>
  <ExecutionProfileWindow/>
@@ -29,9 +28,19 @@
  <Project>
   <ProjectSessionItem path="IoT_UWB"/>
   <ProjectSessionItem path="IoT_UWB;IoT_UWB"/>
+  <ProjectSessionItem path="IoT_UWB;IoT_UWB;SEGGER"/>
+  <ProjectSessionItem path="IoT_UWB;IoT_UWB;Setup"/>
   <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source"/>
   <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source;examples"/>
   <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source;examples;ex_01a_simple_tx"/>
+  <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source;examples;ex_01h_simple_tx_pdoa"/>
+  <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source;examples;ex_02h_simple_rx_pdoa"/>
+  <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source;examples;ex_05b_ds_twr_resp"/>
+  <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source;examples;ex_06a_ss_twr_initiator"/>
+  <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source;examples;ex_06b_ss_twr_responder"/>
+  <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source;examples;ex_06e_AES_ss_twr_initiator"/>
+  <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source;examples;examples_info"/>
+  <ProjectSessionItem path="IoT_UWB;IoT_UWB;Source;platform"/>
   <ProjectSessionItem path="IoT_UWB;IoT_UWB;System"/>
  </Project>
  <Register1>
@@ -69,9 +78,17 @@
   <Watches active="0" update="Never"/>
  </Watch4>
  <Files>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="88" useTextEdit="1" path="Source/main.c" left="0" selected="1" top="77" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="88" useTextEdit="1" path="Source/main.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="23" useTextEdit="1" path="../../Src/examples/ex_01a_simple_tx/simple_tx.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/config_options.c" left="0" top="111" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="12" y="15" useTextEdit="1" path="../../Src/examples/examples_info/example_info.c" left="0" top="21" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="8" y="55" useTextEdit="1" path="../../Src/example_selection.h" left="0" top="18" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="108" y="137" useTextEdit="1" path="../../Src/examples/ex_01h_simple_tx_pdoa/simple_tx_pdoa.c" left="0" top="53" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/ex_06e_AES_ss_twr_initiator/ss_aes_twr_initiator.c" left="0" top="63" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/ex_06a_ss_twr_initiator/ss_twr_initiator_sts.c" left="0" top="0" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="109" useTextEdit="1" path="sdk/modules/nrfx/mdk/ses_startup_nrf_common.s" left="0" top="84" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="16" y="25" useTextEdit="1" path="../../Src/examples/ex_01a_simple_tx/simple_tx.c" left="0" top="18" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/ex_06b_ss_twr_responder/ss_twr_responder_sts.c" left="0" top="21" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="24" y="144" useTextEdit="1" path="../../Src/examples/ex_05b_ds_twr_resp/ds_twr_responder_sts.c" left="0" selected="1" top="318" codecName="Default"/>
  </Files>
- <EMStudioWindow activeProject="IoT_UWB" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="Debug" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="/home/pavel/apps/LOC-PAISA/DW3_QM33_SDK_1.0.2/Drivers/API/Build_Platforms/nRF52840-DK/sdk/components/ble/common" debugSearchPath="" autoConnectCapabilities="4415"/>
+ <EMStudioWindow activeProject="IoT_UWB" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="Debug" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="/home/pavel/apps/LOC-PAISA/DW3_QM33_SDK_1.0.2/Drivers/API/Build_Platforms/nRF52840-DK/sdk/components/ble/common" debugSearchPath="" autoConnectCapabilities="3711"/>
 </session>

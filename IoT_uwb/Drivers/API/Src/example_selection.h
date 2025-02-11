@@ -21,7 +21,7 @@ extern "C"
 
 //#define TEST_READING_DEV_ID
 //#define TEST_SIMPLE_TX
-//#define TEST_SIMPLE_TX_PDOA
+//#define TEST_SIMPLE_TX_PDOA       //this one
 //#define TEST_TX_SLEEP
 //#define TEST_TX_SLEEP_IDLE_RC
 //#define TEST_TX_SLEEP_AUTO
@@ -53,25 +53,25 @@ extern "C"
 //#define TEST_CONTINUOUS_FRAME
 
 //#define TEST_DS_TWR_INITIATOR_STS
-#define TEST_DS_TWR_RESPONDER_STS
+//#define TEST_DS_TWR_RESPONDER_STS
 
 //#define TEST_DS_TWR_INITIATOR
 //#define TEST_DS_TWR_RESPONDER
 
-//#define TEST_DS_TWR_STS_SDC_INITIATOR
+#define TEST_DS_TWR_STS_SDC_INITIATOR     //this one  - does both distance and PDOA
 //#define TEST_DS_TWR_STS_SDC_RESPONDER
 
 //#define TEST_SS_TWR_INITIATOR
-//#define TEST_SS_TWR_RESPONDER
+//#define TEST_SS_TWR_RESPONDER  //this one
 
 //#define TEST_SS_TWR_INITIATOR_STS
-//#define TEST_SS_TWR_RESPONDER_STS
+//#define TEST_SS_TWR_RESPONDER_STS     //this one
 
 //#define TEST_SS_TWR_INITIATOR_STS_NO_DATA
 //#define TEST_SS_TWR_RESPONDER_STS_NO_DATA
 
 //#define TEST_AES_SS_TWR_INITIATOR
-//#define TEST_AES_SS_TWR_RESPONDER
+//#define TEST_AES_SS_TWR_RESPONDER     //this one
 
 //#define TEST_ACK_DATA_TX
 //#define TEST_ACK_DATA_RX

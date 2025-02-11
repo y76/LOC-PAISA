@@ -40,6 +40,9 @@ extern void test_run_info(unsigned char *data);
 /* Example application name */
 #define APP_NAME "SS TWR INIT STS v1.0"
 
+/* Define PI for PDOA calculations */
+#define PI 3.14159265358979f
+
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 1000
 
@@ -74,9 +77,15 @@ static uint32_t status_reg = 0;
 /* Receive response timeout. See NOTE 5 below. */
 #define RESP_RX_TIMEOUT_UUS 700
 
-/* Hold copies of computed time of flight and distance here for reference so that it can be examined at a debug breakpoint. */
+/* Hold copies of computed time of flight and 
+ here for reference so that it can be examined at a debug breakpoint. */
 static double tof;
 static double distance;
+
+/* Add PDOA-related variables */
+static char dist_pdoa_str[80]; // Increased buffer for combined distance and PDOA output
+static int16_t pdoa_val = 0;
+static float pdoa_degrees = 0;
 
 /* Hold the amount of errors that have occurred */
 static uint32_t errors[23] = { 0 };
@@ -173,6 +182,7 @@ int ss_twr_initiator_sts(void)
         test_run_info((unsigned char *)"INIT FAILED     ");
         while (1) { };
     }
+     dwt_setpdoamode(DWT_PDOA_M3);
 
     /* Enabling LEDs here for debug so that for each TX the D1 LED will flash on DW3000 red eval-shield boards.
      * Note, in real low power applications the LEDs should not be used. */
@@ -300,9 +310,18 @@ int ss_twr_initiator_sts(void)
                     tof = ((rtd_init - rtd_resp * (1 - clockOffsetRatio)) / 2.0) * DWT_TIME_UNITS;
                     distance = tof * SPEED_OF_LIGHT;
 
+  pdoa_val = dwt_readpdoa();
+                pdoa_degrees = ((float)pdoa_val / (1<<11)) * 180 / PI;
+                    
+                    /* Display both distance and PDOA */
+                    snprintf(dist_pdoa_str, sizeof(dist_pdoa_str), 
+                            "DIST: %3.2f m, PDOA: %d (%3.1f deg)", 
+                            distance, pdoa_val, pdoa_degrees);
+                    test_run_info((unsigned char *)dist_pdoa_str);
+
                     /* Display computed distance on LCD. */
-                    snprintf(dist_str, sizeof(dist_str), "DIST: %3.2f m", distance);
-                    test_run_info((unsigned char *)dist_str);
+                  //  snprintf(dist_str, sizeof(dist_str), "DIST: %3.2f m", distance);
+                  //  test_run_info((unsigned char *)dist_str);
                 }
                 else
                 {

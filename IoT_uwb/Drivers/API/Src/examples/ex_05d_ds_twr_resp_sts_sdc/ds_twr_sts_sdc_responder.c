@@ -279,8 +279,8 @@ int ds_twr_sts_sdc_responder(void)
                                 distance = tof * SPEED_OF_LIGHT;
 
                                 /* Display computed distance on LCD. */
-                                // sprintf(dist_str, "DIST: %3.2f m", distance);
-                                // test_run_info(dist_str);
+                                 printf("DIST: %3.2f m", distance);
+                                 //test_run_info(dist_str);
 
                                 range_ok = 1;
                             }

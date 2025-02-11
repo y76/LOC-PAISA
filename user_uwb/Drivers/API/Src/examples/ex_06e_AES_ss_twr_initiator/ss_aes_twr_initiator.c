@@ -35,6 +35,9 @@ dwt_mic_size_e dwt_mic_size_from_bytes(uint8_t mic_size_in_bytes);
 /* Example application name */
 #define APP_NAME "SS TWR AES INIT v1.0"
 
+/* Define PI for PDOA calculations */
+#define PI 3.14159265358979f
+
 /* Sample of 802_15_4 frame*/
 mac_frame_802_15_4_format_t mac_frame = {
     /*
@@ -89,7 +92,7 @@ static dwt_config_t config = {
     (129 + 8 - 8),    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
     DWT_STS_MODE_OFF, /* STS disabled */
     DWT_STS_LEN_64,   /* STS length see allowed values in Enum dwt_sts_lengths_e */
-    DWT_PDOA_M0       /* PDOA mode off */
+    DWT_PDOA_M1       /* PDOA mode off */
 };
 
 /* Optional keys according to the key index - In AUX security header*/
@@ -136,6 +139,12 @@ static uint8_t rx_buffer[RX_BUF_LEN];
 static double tof;
 static double distance;
 
+
+/* Add PDOA-related variables */
+static char dist_pdoa_str[80]; // Increased buffer for combined distance and PDOA output
+static int16_t pdoa_val = 0;
+static float pdoa_degrees = 0;
+
 /* Values for the PG_DELAY and TX_POWER registers reflect the bandwidth and power of the spectrum at the current
  * temperature. These values can be calibrated prior to taking reference measurements. See NOTE 6 below. */
 extern dwt_txconfig_t txconfig_options;
@@ -178,7 +187,7 @@ int ss_aes_twr_initiator(void)
         test_run_info((unsigned char *)"INIT FAILED     ");
         while (1) { };
     }
-
+ // dwt_setpdoamode(DWT_PDOA_M3);
     /* Enabling LEDs here for debug so that for each TX the D1 LED will flash on DW3000 red eval-shield boards.
      * Note, in real low power applications the LEDs should not be used. */
     dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK);
@@ -280,6 +289,16 @@ int ss_aes_twr_initiator(void)
             /* Clear good RX frame event in the DW IC status register. */
             dwt_writesysstatuslo(DWT_INT_RXFCG_BIT_MASK);
 
+/* In the frame reception section */
+dwt_pdoa_tdoa_res_t result;
+dwt_read_tdoa_pdoa(&result, 0);  // Read both TDOA and PDOA
+pdoa_val = result.pdoa;
+pdoa_degrees = ((float)pdoa_val / (1<<11)) * 180 / PI;
+
+snprintf(dist_pdoa_str, sizeof(dist_pdoa_str), 
+        "DIST: %3.2f m, PDOA: %d (%3.1f deg), TDOA: %d", 
+        distance, pdoa_val, pdoa_degrees, result.tdoa);
+test_run_info((unsigned char *)dist_pdoa_str);
             /* Read data length that was received */
             frame_len = dwt_getframelength(0);
 
@@ -338,6 +357,18 @@ int ss_aes_twr_initiator(void)
 
                 tof = ((rtd_init - rtd_resp * (1 - clockOffsetRatio)) / 2.0) * DWT_TIME_UNITS;
                 distance = tof * SPEED_OF_LIGHT;
+
+                 pdoa_val = dwt_readpdoa();
+                pdoa_degrees = ((float)pdoa_val / (1<<11)) * 180 / PI;
+                    
+                    /* Display both distance and PDOA */
+                    snprintf(dist_pdoa_str, sizeof(dist_pdoa_str), 
+                            "DIST: %3.2f m, PDOA: %d (%3.1f deg)", 
+                            distance, pdoa_val, pdoa_degrees);
+                    test_run_info((unsigned char *)dist_pdoa_str);
+
+                  //                                  snprintf(dist_str, sizeof(dist_str), "DIST: %3.2f m", distance);
+                 //   test_run_info((unsigned char *)dist_str);
             }
         }
         else

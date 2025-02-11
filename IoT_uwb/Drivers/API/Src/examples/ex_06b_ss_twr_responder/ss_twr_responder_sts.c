@@ -148,7 +148,7 @@ int ss_twr_responder_sts(void)
         test_run_info((unsigned char *)"INIT FAILED     ");
         while (1) { };
     }
-
+dwt_setpdoamode(DWT_PDOA_M3);
     /* Enabling LEDs here for debug so that for each TX the D1 LED will flash on DW3000 red eval-shield boards.
      * Note, in real low power applications the LEDs should not be used. */
     dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK);

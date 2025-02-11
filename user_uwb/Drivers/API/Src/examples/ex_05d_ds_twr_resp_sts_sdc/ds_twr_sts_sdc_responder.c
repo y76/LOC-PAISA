@@ -47,11 +47,14 @@ static dwt_config_t config = {
     (65 + 8 - 8),    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
     DWT_STS_MODE_1 | DWT_STS_MODE_SDC, /* STS mode 1 with SDC see NOTE on SDC below*/
     DWT_STS_LEN_64,                    /* STS length see allowed values in Enum dwt_sts_lengths_e */
-    DWT_PDOA_M0                        /* PDOA mode off */
+    DWT_PDOA_M3                        /* PDOA mode off */
 };
 
 /* have some delay after each range (e.g. so LDC can be updated (on ARM eval boards), needs to be slightly less than RNG_DELAY_MS in the initiator example*/
 #define DELAY_MS 980
+
+/* Define PI for PDOA calculations */
+#define PI 3.14159265358979f
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
 #define TX_ANT_DLY 16385
@@ -89,6 +92,11 @@ static uint32_t status_reg = 0;
 #define FINAL_RX_TIMEOUT_UUS 300
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
 #define PRE_TIMEOUT 5
+
+/* Add PDOA-related variables */
+static char dist_pdoa_str[80]; // Increased buffer for combined distance and PDOA output
+static int16_t pdoa_val = 0;
+static float pdoa_degrees = 0;
 
 /* Timestamps of frames transmission/reception. */
 static uint64_t poll_rx_ts;
@@ -279,8 +287,17 @@ int ds_twr_sts_sdc_responder(void)
                                 distance = tof * SPEED_OF_LIGHT;
 
                                 /* Display computed distance on LCD. */
-                                // sprintf(dist_str, "DIST: %3.2f m", distance);
+                                 printf("DIST: %3.2f m\n", distance);
                                 // test_run_info(dist_str);
+
+                                 pdoa_val = dwt_readpdoa();
+                pdoa_degrees = ((float)pdoa_val / (1<<11)) * 180 / PI;
+                    
+                    /* Display both distance and PDOA */
+                    snprintf(dist_pdoa_str, sizeof(dist_pdoa_str), 
+                            "DIST: %3.2f m, PDOA: %d (%3.1f deg)", 
+                            distance, pdoa_val, pdoa_degrees);
+                    test_run_info((unsigned char *)dist_pdoa_str);
 
                                 range_ok = 1;
                             }
