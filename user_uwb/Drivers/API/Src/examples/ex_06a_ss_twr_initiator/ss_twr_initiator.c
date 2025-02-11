@@ -45,7 +45,7 @@ static dwt_config_t config = {
     (129 + 8 - 8),    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
     DWT_STS_MODE_OFF, /* STS disabled */
     DWT_STS_LEN_64,   /* STS length see allowed values in Enum dwt_sts_lengths_e */
-    DWT_PDOA_M1       /* PDOA mode off */
+    DWT_PDOA_M3       /* PDOA mode off */
 };
 
 /* Inter-ranging delay period, in milliseconds. */
@@ -143,7 +143,7 @@ int ss_twr_initiator(void)
 
     /* Configure the TX spectrum parameters (power, PG delay and PG count) */
     dwt_configuretxrf(&txconfig_options);
-
+dwt_setpdoamode(DWT_PDOA_M3);
     /* Apply default antenna delay value. See NOTE 2 below. */
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);

@@ -85,14 +85,14 @@ static dwt_config_t config = {
     DWT_PAC8,         /* Preamble acquisition chunk size. Used in RX only. */
     9,                /* TX preamble code. Used in TX only. */
     9,                /* RX preamble code. Used in RX only. */
-    1,                /* 0 to use standard 8 symbol SFD, 1 to use non-standard 8 symbol, 2 for non-standard 16 symbol SFD and 3 for 4z 8 symbol SDF type */
+    3,                /* 0 to use standard 8 symbol SFD, 1 to use non-standard 8 symbol, 2 for non-standard 16 symbol SFD and 3 for 4z 8 symbol SDF type */
     DWT_BR_6M8,       /* Data rate. */
     DWT_PHRMODE_STD,  /* PHY header mode. */
     DWT_PHRRATE_STD,  /* PHY header rate. */
     (129 + 8 - 8),    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
     DWT_STS_MODE_OFF, /* STS disabled */
     DWT_STS_LEN_64,   /* STS length see allowed values in Enum dwt_sts_lengths_e */
-    DWT_PDOA_M1       /* PDOA mode off */
+    DWT_PDOA_M3       /* PDOA mode off */
 };
 
 /* Optional keys according to the key index - In AUX security header*/
@@ -202,7 +202,7 @@ int ss_aes_twr_initiator(void)
 
     /* Configure the TX spectrum parameters (power, PG delay and PG count) */
     dwt_configuretxrf(&txconfig_options);
-
+dwt_setpdoamode(DWT_PDOA_M3);
     /* Apply default antenna delay value. See NOTE 2 below. */
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);

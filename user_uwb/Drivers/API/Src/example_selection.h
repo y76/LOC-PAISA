@@ -59,12 +59,12 @@ extern "C"
 //#define TEST_DS_TWR_RESPONDER
 
 //#define TEST_DS_TWR_STS_SDC_INITIATOR
-#define TEST_DS_TWR_STS_SDC_RESPONDER   //this one  - does both distance and PDOA
+//#define TEST_DS_TWR_STS_SDC_RESPONDER   //this one  - does both distance and PDOA
 
 //#define TEST_SS_TWR_INITIATOR  //this one
 //#define TEST_SS_TWR_RESPONDER
 
-//#define TEST_SS_TWR_INITIATOR_STS //this one
+#define TEST_SS_TWR_INITIATOR_STS //this one - does both distance and PDOA
 //#define TEST_SS_TWR_RESPONDER_STS
 
 //#define TEST_SS_TWR_INITIATOR_STS_NO_DATA

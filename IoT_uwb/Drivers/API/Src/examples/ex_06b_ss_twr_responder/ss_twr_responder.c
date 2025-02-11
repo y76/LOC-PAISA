@@ -43,7 +43,7 @@ static dwt_config_t config = {
     (129 + 8 - 8),    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
     DWT_STS_MODE_OFF, /* STS disabled */
     DWT_STS_LEN_64,   /* STS length see allowed values in Enum dwt_sts_lengths_e */
-    DWT_PDOA_M1       /* PDOA mode off */
+    DWT_PDOA_M3       /* PDOA mode off */
 };
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 2 below. */

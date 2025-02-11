@@ -182,7 +182,7 @@ int ss_twr_initiator_sts(void)
         test_run_info((unsigned char *)"INIT FAILED     ");
         while (1) { };
     }
-     dwt_setpdoamode(DWT_PDOA_M3);
+     
 
     /* Enabling LEDs here for debug so that for each TX the D1 LED will flash on DW3000 red eval-shield boards.
      * Note, in real low power applications the LEDs should not be used. */
@@ -195,7 +195,7 @@ int ss_twr_initiator_sts(void)
         test_run_info((unsigned char *)"CONFIG FAILED     ");
         while (1) { };
     }
-
+dwt_setpdoamode(DWT_PDOA_M3);
     /* Configure the TX spectrum parameters (power, PG delay and PG count) */
     if (config_options.chan == 5)
     {

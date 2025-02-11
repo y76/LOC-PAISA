@@ -55,14 +55,14 @@ static dwt_config_t config = {
     DWT_PAC8,         /* Preamble acquisition chunk size. Used in RX only. */
     9,                /* TX preamble code. Used in TX only. */
     9,                /* RX preamble code. Used in RX only. */
-    1,                /* 0 to use standard 8 symbol SFD, 1 to use non-standard 8 symbol, 2 for non-standard 16 symbol SFD and 3 for 4z 8 symbol SDF type */
+    3,                /* 0 to use standard 8 symbol SFD, 1 to use non-standard 8 symbol, 2 for non-standard 16 symbol SFD and 3 for 4z 8 symbol SDF type */
     DWT_BR_6M8,       /* Data rate. */
     DWT_PHRMODE_STD,  /* PHY header mode. */
     DWT_PHRRATE_STD,  /* PHY header rate. */
     (129 + 8 - 8),    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
-    DWT_STS_MODE_OFF, /* STS disabled */
-    DWT_STS_LEN_64,   /* STS length see allowed values in Enum dwt_sts_lengths_e */
-    DWT_PDOA_M1       /* PDOA mode off */
+    DWT_STS_MODE_1, /* STS disabled */
+    DWT_STS_LEN_128,   /* STS length see allowed values in Enum dwt_sts_lengths_e */
+    DWT_PDOA_M3       /* PDOA mode off */
 };
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 2 below. */
@@ -105,6 +105,29 @@ static uint64_t resp_tx_ts;
 /* Values for the PG_DELAY and TX_POWER registers reflect the bandwidth and power of the spectrum at the current
  * temperature. These values can be calibrated prior to taking reference measurements. See NOTE 5 below. */
 extern dwt_txconfig_t txconfig_options;
+
+/*
+ * 128-bit STS key to be programmed into CP_KEY register.
+ *
+ * This key needs to be known and programmed the same at both units performing the SS-TWR.
+ * In a real application for security this would be private and unique to the two communicating units
+ * and chosen/assigned in a secure manner lasting just for the period of their association.
+ *
+ * Here we use a default KEY as specified in the IEEE 802.15.4z annex
+ */
+static dwt_sts_cp_key_t cp_key = { 0x14EB220F, 0xF86050A8, 0xD1D336AA, 0x14148674 };
+
+/*
+ * 128-bit initial value for the nonce to be programmed into the CP_IV register.
+ *
+ * The IV, like the key, needs to be known and programmed the same at both units performing the SS-TWR.
+ * It can be considered as an extension of the KEY. The low 32 bits of the IV is the counter.
+ * In a real application for any particular key the value of the IV including the count should not be reused,
+ * i.e. if the counter value wraps the upper 96-bits of the IV should be changed, e.g. incremented.
+ *
+ * Here we use a default IV as specified in the IEEE 802.15.4z annex
+ */
+static dwt_sts_cp_iv_t cp_iv = { 0x1F9A3DE4, 0xD37EC3CA, 0xC44FA8FB, 0x362EEB34 };
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn ss_aes_twr_responder()
