@@ -1,0 +1,137 @@
+<!DOCTYPE CrossStudio_Session_File>
+<session>
+ <Bookmarks/>
+ <Breakpoints groups="Breakpoints" active_group="Breakpoints">
+  <BreakpointListItem trigger="" line="119" counter="0" hardwareBreakpoint="" isFunctionBreakpoint="false" action="" expression="" stopAll="false" group="Breakpoints" type="Breakpoint" state="4" filename="../../Src/examples/ex_01a_simple_tx/simple_tx.c" useHWbreakpoint="false"/>
+  <BreakpointListItem trigger="" line="216" counter="0" hardwareBreakpoint="" isFunctionBreakpoint="false" action="" expression="" stopAll="false" group="Breakpoints" type="Breakpoint" state="2" filename="../../Src/examples/ex_01a_simple_tx/simple_tx.c" useHWbreakpoint="false"/>
+  <Exceptions set="MemManage;UsageFault_Coprocessor;UsageFault_CheckingError;UsageFault_StateError;BusFault;ExceptionEntryReturnFault;HardFault"/>
+ </Breakpoints>
+ <ExecutionProfileWindow/>
+ <FrameBuffer>
+  <FrameBufferWindow width="0" keepAspectRatio="0" zoomToFitWindow="0" showGrid="0" addressSpace="" format="0" height="0" autoEvaluate="0" scaleFactor="1" refreshPeriod="0" name="dw3000_api_Debug" addressText="" accessByDisplayWidth="0"/>
+ </FrameBuffer>
+ <Memory1>
+  <MemoryWindow addressSpace="" dataSize="1" autoEvaluate="0" viewMode="0" viewType="4" addressOrder="0" columnsText="" refreshPeriod="0" name="dw3000_api_Debug" sizeText="" addressText=""/>
+ </Memory1>
+ <Memory2>
+  <MemoryWindow addressSpace="" dataSize="1" autoEvaluate="0" viewMode="0" viewType="4" addressOrder="0" columnsText="" refreshPeriod="0" name="dw3000_api_Debug" sizeText="" addressText=""/>
+ </Memory2>
+ <Memory3>
+  <MemoryWindow addressSpace="" dataSize="1" autoEvaluate="0" viewMode="0" viewType="4" addressOrder="0" columnsText="" refreshPeriod="0" name="dw3000_api_Debug" sizeText="" addressText=""/>
+ </Memory3>
+ <Memory4>
+  <MemoryWindow addressSpace="" dataSize="1" autoEvaluate="0" viewMode="0" viewType="4" addressOrder="0" columnsText="" refreshPeriod="0" name="dw3000_api_Debug" sizeText="" addressText=""/>
+ </Memory4>
+ <Project>
+  <ProjectSessionItem path="dw3000_api"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;SEGGER"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Setup"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_01a_simple_tx"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_01g_simple_tx_sts_sdc"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_01i_simple_tx_aes"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_02h_simple_rx_pdoa"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_02j_rx_adc_capture"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_02k_simple_rx_cir"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_03a_tx_wait_resp"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_03b_rx_send_resp"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_03d_tx_wait_resp_interrupts"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_04a_cont_wave"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_04b_cont_frame"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_05a_ds_twr_init"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_05b_ds_twr_resp"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_05c_ds_twr_init_sts_sdc"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_06a_ss_twr_initiator"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_06b_ss_twr_responder"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_06e_AES_ss_twr_initiator"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_06f_AES_ss_twr_responder"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_07a_ack_data_tx"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_07b_ack_data_rx"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_11a_spi_crc"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;ex_14_otp_write"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;examples_info"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;examples;shared_data"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;platform"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;SDK"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;SDK;nRF_Drivers"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;Shared"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;Source;Shared;dw3720"/>
+  <ProjectSessionItem path="dw3000_api;dw3000_api;System"/>
+ </Project>
+ <Register1>
+  <RegisterWindow invisibleNodes="" visibleNodes="CPU - Current Context/r0;CPU - Current Context/r1;CPU - Current Context/r2;CPU - Current Context/r3;CPU - Current Context/r4;CPU - Current Context/r5;CPU - Current Context/r6;CPU - Current Context/r7;CPU - Current Context/r8;CPU - Current Context/r9;CPU - Current Context/r10;CPU - Current Context/r11;CPU - Current Context/r12;CPU - Current Context/sp(r13);CPU - Current Context/lr(r14);CPU - Current Context/pc(r15);CPU - Current Context/apsr;CPU/r0;CPU/r1;CPU/r2;CPU/r3;CPU/r4;CPU/r5;CPU/r6;CPU/r7;CPU/r8;CPU/r9;CPU/r10;CPU/r11;CPU/r12;CPU/sp(r13);CPU/lr(r14);CPU/pc(r15);CPU/xpsr;CPU/MSP;CPU/PSP;CPU/PRIMASK;CPU/BASEPRI;CPU/FAULTMASK;CPU/CONTROL;CPU/internal" binaryNodes="" asciiNodes="" openNodes="CPU - Current Context" name="dw3000_api_Debug" decimalNodes="" octalNodes="" unsignedNodes=""/>
+ </Register1>
+ <Register2>
+  <RegisterWindow invisibleNodes="" visibleNodes="CPU - Current Context/r0;CPU - Current Context/r1;CPU - Current Context/r2;CPU - Current Context/r3;CPU - Current Context/r4;CPU - Current Context/r5;CPU - Current Context/r6;CPU - Current Context/r7;CPU - Current Context/r8;CPU - Current Context/r9;CPU - Current Context/r10;CPU - Current Context/r11;CPU - Current Context/r12;CPU - Current Context/sp(r13);CPU - Current Context/lr(r14);CPU - Current Context/pc(r15);CPU - Current Context/apsr;CPU/r0;CPU/r1;CPU/r2;CPU/r3;CPU/r4;CPU/r5;CPU/r6;CPU/r7;CPU/r8;CPU/r9;CPU/r10;CPU/r11;CPU/r12;CPU/sp(r13);CPU/lr(r14);CPU/pc(r15);CPU/xpsr;CPU/MSP;CPU/PSP;CPU/PRIMASK;CPU/BASEPRI;CPU/FAULTMASK;CPU/CONTROL;CPU/internal" binaryNodes="" asciiNodes="" openNodes="CPU - Current Context" name="dw3000_api_Debug" decimalNodes="" octalNodes="" unsignedNodes=""/>
+ </Register2>
+ <Register3>
+  <RegisterWindow invisibleNodes="" visibleNodes="CPU - Current Context/r0;CPU - Current Context/r1;CPU - Current Context/r2;CPU - Current Context/r3;CPU - Current Context/r4;CPU - Current Context/r5;CPU - Current Context/r6;CPU - Current Context/r7;CPU - Current Context/r8;CPU - Current Context/r9;CPU - Current Context/r10;CPU - Current Context/r11;CPU - Current Context/r12;CPU - Current Context/sp(r13);CPU - Current Context/lr(r14);CPU - Current Context/pc(r15);CPU - Current Context/apsr;CPU/r0;CPU/r1;CPU/r2;CPU/r3;CPU/r4;CPU/r5;CPU/r6;CPU/r7;CPU/r8;CPU/r9;CPU/r10;CPU/r11;CPU/r12;CPU/sp(r13);CPU/lr(r14);CPU/pc(r15);CPU/xpsr;CPU/MSP;CPU/PSP;CPU/PRIMASK;CPU/BASEPRI;CPU/FAULTMASK;CPU/CONTROL;CPU/internal" binaryNodes="" asciiNodes="" openNodes="CPU - Current Context" name="dw3000_api_Debug" decimalNodes="" octalNodes="" unsignedNodes=""/>
+ </Register3>
+ <Register4>
+  <RegisterWindow invisibleNodes="" visibleNodes="CPU - Current Context/r0;CPU - Current Context/r1;CPU - Current Context/r2;CPU - Current Context/r3;CPU - Current Context/r4;CPU - Current Context/r5;CPU - Current Context/r6;CPU - Current Context/r7;CPU - Current Context/r8;CPU - Current Context/r9;CPU - Current Context/r10;CPU - Current Context/r11;CPU - Current Context/r12;CPU - Current Context/sp(r13);CPU - Current Context/lr(r14);CPU - Current Context/pc(r15);CPU - Current Context/apsr;CPU/r0;CPU/r1;CPU/r2;CPU/r3;CPU/r4;CPU/r5;CPU/r6;CPU/r7;CPU/r8;CPU/r9;CPU/r10;CPU/r11;CPU/r12;CPU/sp(r13);CPU/lr(r14);CPU/pc(r15);CPU/xpsr;CPU/MSP;CPU/PSP;CPU/PRIMASK;CPU/BASEPRI;CPU/FAULTMASK;CPU/CONTROL;CPU/internal" binaryNodes="" asciiNodes="" openNodes="CPU - Current Context" name="dw3000_api_Debug" decimalNodes="" octalNodes="" unsignedNodes=""/>
+ </Register4>
+ <Threads>
+  <ThreadsWindow showLists=""/>
+ </Threads>
+ <TraceWindow>
+  <Trace enabled="Yes"/>
+ </TraceWindow>
+ <Watch1>
+  <Watches active="1" update="Never"/>
+ </Watch1>
+ <Watch2>
+  <Watches active="0" update="Never"/>
+ </Watch2>
+ <Watch3>
+  <Watches active="0" update="Never"/>
+ </Watch3>
+ <Watch4>
+  <Watches active="0" update="Never"/>
+ </Watch4>
+ <Files>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/shared_data/shared_functions.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/config_options.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="22" useTextEdit="1" path="../../Src/example_selection.h" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="88" useTextEdit="1" path="Source/main.c" left="0" top="65" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="12" y="15" useTextEdit="1" path="../../Src/examples/examples_info/example_info.c" left="0" top="6" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="26" y="41" useTextEdit="1" path="sdk/components/ble/common/ble_advdata.h" left="0" top="24" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="17" y="39" useTextEdit="1" path="sdk/components/ble/common/ble_advdata.c" left="0" top="39" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="215" useTextEdit="1" path="../../Src/examples/ex_01a_simple_tx/simple_tx.c" left="0" selected="1" top="183" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="43" useTextEdit="1" path="sdk/components/softdevice/s140/headers/nrf52/nrf_mbr.h" left="0" top="17" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="9" y="132" useTextEdit="1" path="sdk/components/libraries/util/app_util.h" left="0" top="110" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="9" y="13" useTextEdit="1" path="Source/platform/deca_probe_interface.h" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="70" useTextEdit="1" path="sdk/integration/nrfx/nrfx_glue.h" left="0" top="48" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="43" useTextEdit="1" path="sdk/modules/nrfx/hal/nrf_gpio.h" left="0" top="36" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="25" y="44" useTextEdit="1" path="Source/platform/deca_spi.h" left="0" top="18" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="10" y="4319" useTextEdit="1" path="Source/config/sdk_config.h" left="0" top="4317" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="31" useTextEdit="1" path="Source/platform/port.h" left="0" top="5" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="13" useTextEdit="1" path="../../Src/examples/ex_01d_tx_timed_sleep/tx_timed_sleep.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="59" useTextEdit="1" path="sdk/components/libraries/util/app_util_platform.h" left="0" top="59" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="33" y="106" useTextEdit="1" path="../../Shared/dwt_uwb_driver/deca_device_api.h" left="0" top="106" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="19" y="163" useTextEdit="1" path="sdk/components/softdevice/common/nrf_sdh.c" left="0" top="148" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="9" y="523" useTextEdit="1" path="sdk/modules/nrfx/drivers/src/nrfx_spim.c" left="0" top="495" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="19" y="170" useTextEdit="1" path="../../Src/examples/ex_02g_simple_rx_sts_sdc/simple_rx_sts_sdc.c" left="0" top="125" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/ex_03d_tx_wait_resp_interrupts/tx_wait_resp_int.c" left="0" top="150" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="104" useTextEdit="1" path="../../Src/examples/ex_05b_ds_twr_resp/ds_twr_responder_sts.c" left="0" top="58" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="30" y="275" useTextEdit="1" path="../../Src/examples/ex_05a_ds_twr_init/ds_twr_initiator_sts.c" left="0" top="229" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="51" y="48" useTextEdit="1" path="../../Src/examples/ex_06f_AES_ss_twr_responder/ss_aes_twr_responder.c" left="0" top="48" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="82" y="95" useTextEdit="1" path="../../Src/examples/ex_06e_AES_ss_twr_initiator/ss_aes_twr_initiator.c" left="0" top="75" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/ex_05c_ds_twr_init_sts_sdc/ds_twr_sts_sdc_initiator.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/ex_02h_simple_rx_pdoa/simple_rx_pdoa.c" left="0" top="36" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="45" y="65" useTextEdit="1" path="../../Src/examples/ex_01i_simple_tx_aes/simple_tx_aes.c" left="0" top="33" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/ex_01g_simple_tx_sts_sdc/simple_tx_sts_sdc.c" left="0" top="12" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/ex_05a_ds_twr_init/ds_twr_initiator.c" left="0" top="108" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="48" y="116" useTextEdit="1" path="../../Src/examples/ex_02i_simple_rx_aes/simple_rx_aes.c" left="0" top="95" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/ex_06b_ss_twr_responder/ss_twr_responder_sts_no_data.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="34" y="82" useTextEdit="1" path="../../Src/examples/ex_06b_ss_twr_responder/ss_twr_responder_sts.c" left="0" top="82" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="22" y="109" useTextEdit="1" path="../../Src/examples/ex_06a_ss_twr_initiator/ss_twr_initiator_sts.c" left="0" top="76" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="0" useTextEdit="1" path="../../Src/examples/ex_06b_ss_twr_responder/ss_twr_responder.c" left="0" top="18" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="19" y="34" useTextEdit="1" path="../../Src/examples/ex_06a_ss_twr_initiator/ss_twr_initiator.c" left="0" top="24" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="9191" useTextEdit="1" path="../../Shared/dwt_uwb_driver/dw3720/dw3720_device.c" left="0" top="9170" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="204" useTextEdit="1" path="Source/platform/deca_spi.c" left="0" top="182" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="559" useTextEdit="1" path="sdk/modules/nrfx/hal/nrf_spim.h" left="0" top="537" codecName="Default"/>
+ </Files>
+ <EMStudioWindow activeProject="dw3000_api" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="Debug" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="/home/pavel/apps/LOC-PAISA/DW3_QM33_SDK_1.0.2/Drivers/API/Build_Platforms/nRF52840-DK/sdk/components/ble/common" debugSearchPath="" autoConnectCapabilities="3711"/>
+</session>

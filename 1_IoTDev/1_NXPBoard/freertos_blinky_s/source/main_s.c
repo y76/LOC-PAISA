@@ -491,7 +491,7 @@ void syncAck(const uint8_t *resp_buffer)
 	PRINTF("\r\n");
 
 	USART_WriteBlocking(WIFI_USART, ack_buffer, msg_len);
-    USART_WriteBlocking(WIFI_USART2, ack_buffer, msg_len);
+   // USART_WriteBlocking(WIFI_USART2, ack_buffer, msg_len);
 
 
 }
@@ -698,7 +698,7 @@ void announcement()
 		PRINTF("\r\n");
 
 	USART_WriteBlocking(WIFI_USART, msg, msg_len);
-    USART_WriteBlocking(WIFI_USART2, msg, msg_len);
+    //USART_WriteBlocking(WIFI_USART2, msg, msg_len);
 
 }
 
