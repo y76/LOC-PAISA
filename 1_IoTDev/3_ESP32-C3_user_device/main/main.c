@@ -974,7 +974,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                          aes_key.key4, aes_key.key5, aes_key.key6, aes_key.key7);
 
                 // Send Announcement data over to UWB board.
-                send_uart_data(debug_disc->data, total_length);
+               // send_uart_data(debug_disc->data, total_length);
 
                 // Create and send STS and AES data over UART
                 uint8_t crypto_data[64]; // Increased to hold both STS and AES data
