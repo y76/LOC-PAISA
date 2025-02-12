@@ -58,6 +58,8 @@
 #include <stdio.h>
 #include <time.h>
 #include "fsl_iap.h"
+#include "mbedtls/gcm.h"
+#include "mbedtls/cipher.h"
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -114,11 +116,13 @@ typedef void (*NonSecureResetHandler_t)(void) __attribute__((cmse_nonsecure_call
 #define TIME_PREV			(1681506039)
 #define ID_DEV				(19682938)
 //#define PRV_DEV_KEY_PEM "-----BEGIN PRIVATE KEY-----\r\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCdxdKced+CH6V6\r\nZKUTNCKveBLKkJOFdYWMsnenSxOhnAO9/U6AXIk67PDMLklx6dS8ODJOtrFDpm3q\r\nGitEV8Tz4ImbVQBlCnqtcCtgaK0mOnSs9q9dwNMRospPeORcrTAl4aD0iQWLPSAs\r\n+uRxaKUigKFd2w0RTVp0wFbswMkGHYrgvgngJtMXWJrbfcGoI5z3vhAfKHhu7+Qk\r\nLShqnuYCmbZNeHh+2QEPgwLNBD5gXJKB7NyyV2miekMR77C6cM5/t0tkOAFRsq2H\r\nIbXqnjhEo2ePc3h3CXps+4DqmL/T0MCl3XvKrxvtpT0NPJWIF9EJiksmzofKretg\r\nmYGgnDoJAgMBAAECggEAIth+wC2QplIr/6C77sZchMmtyMxusJK4uM7v62SDBPYK\r\nw4rvLB2D954+PrJYaU7eO+XjgowKEalv7Dz0YmdKKhzk94gqCqbqWmUER4pG98MA\r\nYvUm3TuJwoLkUPIf6bIciLlRDcE3lr2c3iJZkwysMDcdrLeFJtWhTVjvueGIZI+H\r\n2dR+uwXnVcRgsa0OV7Ad3ybRGlV4D6jQXNIBfhqla0Ae9xXupbm5M+/YbC7JUsKC\r\n7pOxmMB+bhPceqiCQHbfK7866BqdG4+yD0g9LJ9v5JCMqWE///X6wrZ0vZY/zNOz\r\n2CKAJkKDZXjlAHfKjFKRUHNaf4xYWVTdcIMMtHKJkwKBgQDWCZR2qotF+encgG/w\r\n1iGdYrH+qApviUr/yH3rvzelAsI4G/2T4Tt4sSXq7SMSCGoO+4+OnIRt2c3GUwUs\r\nJaWgGrR26Cuw24LXhN9CtOwnkg5VbW2BomVBzXBzE/T5D3ItKX5mKmVSuMGI83TK\r\n/m4lWkbXFOe5q+AdZ+OugIUsTwKBgQC8tFmFfk3/2gbEQw7gZcuITR0dAMAqrPGx\r\nvNZqV6gHjB6ooLqBpjsZ2mNG7+0aPaaXj9VP6q+LvXSdhuUgC0fbtYnV4nyVQhht\r\nEVTzXfBP0eNWYq+WJ1oKgLrX2/Ig7ivAZysXNFZQXYlGKAoLLdepUHiOrkBDn/RE\r\ndoELhuVmJwKBgHt20zkQb35SBuC3Bdt66bELuXkYHczw+V5KnLhceRCqYrZTDxc6\r\nmT+pkCHP4KcKS4ORAOJWzt0/AkAgq58nqD6OqQLeMjW2qecAMnkcPA0nZzVIBh79\r\nOkOW6gK3xFvW2RnMEamFUyVAhgMlzH07/vV0+eAfovurdYAA6YlDgY5pAoGBALEi\r\nnnIoKPHFaNqsk/dittbghDaocLrekxajy6YRWIKVLmZeUhTHxOy0ysJZD/m063+U\r\nHcmh5F1JX4FLkiMtU6vTUmq66vV1ENa5EURN5voWbM+3XVmW4PfA9SMRrMzqpZk7\r\nfwCOOYPA+c4oYZ0y0CF4j2JoAZ05NiNaFjKK0yW7AoGBAMXy/QOYNSBGWcyNOCM6\r\nXz5kqGtGDw+GDG76o+TWOTmnjJa+KKwpW0Hj8SRDF6ngmqjK42sRzgLhm2ke79xd\r\njxwAWt9+fpdd4Bgltn9zWCbqfmwsRUKMrZ43K2Ydc1B1045j/kIvLXhmoP0PVNZQ\r\nDB/NHjpP1IKzPqQemhNUtEku\r\n-----END PRIVATE KEY-----"
-#define PRV_DEV_KEY_PEM		"-----BEGIN EC PRIVATE KEY-----\r\nMHcCAQEEIF3U39mcfT5CzujDNem0gk4x1bzPodlveTZZhKbJdtFToAoGCCqGSM49\r\nAwEHoUQDQgAEuQnbuq0OifGY0Fb9TlVw+Y8wXX28TiW+Yq38CIx5sVghlTjBmuFh\r\nm0yBJr5L88OHBd9ymb3S5idXq0EStfbv3Q==\r\n-----END EC PRIVATE KEY-----"
-#define PRV_DEV_PRIV_KEY_2 "-----BEGIN EC PRIVATE KEY-----\r\nMHcCAQEEIMCN41GeyddpeoLLRxYWxXuhA6zPWFQP+tUrETjQMCNIoAoGCCqGSM49\r\nAwEHoUQDQgAEmYbN0Zu2DcGhrNVf9zVXlir1Bl8plvUn5imN21xGlZccAWLFmOw6\r\nkNLPGlgDR5io4caAnOtpTlRfKwhC5nKGoA==\r\n-----END EC PRIVATE KEY-----"
+//#define PRV_DEV_KEY_PEM		"-----BEGIN EC PRIVATE KEY-----\r\nMHcCAQEEIF3U39mcfT5CzujDNem0gk4x1bzPodlveTZZhKbJdtFToAoGCCqGSM49\r\nAwEHoUQDQgAEuQnbuq0OifGY0Fb9TlVw+Y8wXX28TiW+Yq38CIx5sVghlTjBmuFh\r\nm0yBJr5L88OHBd9ymb3S5idXq0EStfbv3Q==\r\n-----END EC PRIVATE KEY-----"
+#define PRV_DEV_KEY_PEM			"-----BEGIN EC PRIVATE KEY-----\r\nMHcCAQEEILU1UM1iS7FVYItkMFIjXzAoZ15ggKPolhQpkm8Fpvb+oAoGCCqGSM49\r\nAwEHoUQDQgAE25n7ySdcmAANQrUIgnTl0cMdUy4fkWOW/coAj0af2h56PveM7sqe\r\nMGraQzrlNghIOU2Q3We5HyZhhEypxUJIKg==\r\n-----END EC PRIVATE KEY-----"
+//^this is new key
+//#define PRV_DEV_PRIV_KEY_2 "-----BEGIN EC PRIVATE KEY-----\r\nMHcCAQEEIMCN41GeyddpeoLLRxYWxXuhA6zPWFQP+tUrETjQMCNIoAoGCCqGSM49\r\nAwEHoUQDQgAEmYbN0Zu2DcGhrNVf9zVXlir1Bl8plvUn5imN21xGlZccAWLFmOw6\r\nkNLPGlgDR5io4caAnOtpTlRfKwhC5nKGoA==\r\n-----END EC PRIVATE KEY-----"
 //#define PUB_M_SRV_KEY_PEM "-----BEGIN PUBLIC KEY-----\r\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5rsw8U6LAUNkn5Ww7s5X\r\nDQH0NCnpXA+UdQzbtUb8zzXNrMix6fFBD0+SEJNYoUeYTsm0cAdegCZHlTxCtdW2\r\n8sTyY9ssg7PWIqJZHpQ0WmagOWl06Luh7Wxuk4iMDe68eLnpJgi2X7WsZiA5bmXf\r\nrWpV/15v7VwWvjJrt6C9N3l4KcfTxljRJS3vDCkQuse15lWtKccpKV8fg70Ax0PZ\r\n0hYiWcEGJrXKoFKdeWnxz9Kb36K0mtQddYCdP0ec24ZVkNAcxMlFk+az6P1VvWO7\r\n3UyAat3d4yfH7nZV1h/8vRyHI3+Uh/XCfnwFLemsuK9xygtm3uLjYurOtbZZCtH9\r\n5wIDAQAB\r\n-----END PUBLIC KEY-----"
 #define PUB_M_SRV_KEY_PEM 		"-----BEGIN PUBLIC KEY-----\r\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEp5WVs1qXLCPdYresNZkyJ192FxXA\r\nTxFzfZHwtWX+xs50yc4x4ax7sNrzWyAe3F87ZZ8MpK+e60gEJumTrp6mzA==\r\n-----END PUBLIC KEY-----"
-#define M_SRV_URL				"https://bit.ly/430XMb1"//"https://bit.ly/4hAjeaU"//"https://bit.ly/4glPu0g"//"https://bit.ly/3HnHwEu"
+#define M_SRV_URL				"https://bit.ly/3EJadxK"//"https://bit.ly/430XMb1"//"https://bit.ly/4hAjeaU"//"https://bit.ly/4glPu0g"//"https://bit.ly/3HnHwEu"
 #define MSG_END_CHAR		"MSGEND"
 #define ACK_END_CHAR		"ACKEND"
 
@@ -285,7 +289,7 @@ void findMessage(const uint8_t* buffer, uint16_t length) {
         }
     }
 }
-
+/*
 void WIFI_USART_IRQHandler(void)
 {
     // Prevent infinite processing
@@ -334,6 +338,299 @@ void WIFI_USART_IRQHandler(void)
     // Clear any receive errors
     USART_ClearStatusFlags(WIFI_USART, kUSART_RxError);
     SDK_ISR_EXIT_BARRIER;
+}*/
+
+static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encrypted_len,
+                                    const char *private_key_pem,
+                                    const uint8_t *peer_public_key, size_t peer_public_key_len,
+                                    const uint8_t *iv,
+                                    uint8_t *decrypted_data, size_t *decrypted_len) {
+    mbedtls_ecdh_context ctx;
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_pk_context peer_pk;
+    mbedtls_gcm_context gcm;
+    const char *pers = "ecdh_decrypt";
+    int ret = 0;
+    uint8_t shared_secret[32];
+    uint8_t tag[16];
+
+    // Initialize contexts
+    mbedtls_ecdh_init(&ctx);
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    mbedtls_pk_init(&peer_pk);
+    mbedtls_gcm_init(&gcm);
+
+    // Seed RNG
+    ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
+                                (const unsigned char *)pers, strlen(pers));
+    if (ret != 0) {
+        PRINTF("RNG seed failed: -0x%x\n", -ret);
+        goto cleanup;
+    }
+
+    // Parse private key
+   // ret = mbedtls_pk_parse_key(&priv_key,
+   //                           (const unsigned char *)private_key_pem,
+    //                          strlen(private_key_pem) + 1,
+    //                          NULL,
+    //                          0);
+    //if (ret != 0) {
+    //    PRINTF("Private key parsing failed: -0x%x\n", -ret);
+   ////     goto cleanup;
+   // }
+
+    // Setup ECDH with specific curve
+    ret = mbedtls_ecdh_setup(&ctx, MBEDTLS_ECP_DP_SECP256R1);
+    if (ret != 0) {
+        PRINTF("ECDH setup failed: -0x%x\n", -ret);
+        goto cleanup;
+    }
+
+    // Validate public key format
+    if (peer_public_key_len != 65 || peer_public_key[0] != 0x04) {
+        PRINTF("Invalid public key format. Length: %zu, First byte: 0x%02x\n",
+               peer_public_key_len, peer_public_key[0]);
+        ret = MBEDTLS_ERR_ECP_BAD_INPUT_DATA;
+        goto cleanup;
+    }
+    PRINTF("Ephemeral Public Key (65 bytes):");
+    for (int i = 0; i < 65; i++) {
+    	PRINTF("%02x ", peer_public_key[i]);
+    }
+    PRINTF("\n");
+    // Explicitly read public key
+    ret = mbedtls_pk_parse_public_key(&peer_pk, peer_public_key, peer_public_key_len);
+    if (ret != 0) {
+        PRINTF("Failed to read peer public key: -0x%x\n", -ret);
+        goto cleanup;
+    }
+
+    // Load our private key for shared secret computation
+  //  const mbedtls_ecp_keypair *our_keypair = mbedtls_pk_ec(priv_key);
+
+    // Compute shared secret
+    //ret = mbedtls_ecdh_compute_shared(&ctx.grp, &ctx.z, &ctx.Q, &our_keypair->d,
+    //                                 mbedtls_ctr_drbg_random, &ctr_drbg);
+   // if (ret != 0) {
+   //     PRINTF("Shared secret computation failed: -0x%x\n", -ret);
+   //     goto cleanup;
+   // }
+
+    // Extract shared secret
+    ret = mbedtls_mpi_write_binary(&ctx.z, shared_secret, sizeof(shared_secret));
+    if (ret != 0) {
+        PRINTF("Failed to extract shared secret: -0x%x\n", -ret);
+        goto cleanup;
+    }
+
+    // Print shared secret for debugging
+    PRINTF("Shared Secret (32 bytes):\n");
+    for (int i = 0; i < 32; i++) {
+        PRINTF("%02x ", shared_secret[i]);
+        if ((i + 1) % 16 == 0) PRINTF("\n");
+    }
+    PRINTF("\n");
+
+    // Separate encrypted data and tag
+    size_t data_len = encrypted_len - 16;
+
+    // Extract tag from end of encrypted data
+    memcpy(tag, encrypted_data + data_len, 16);
+
+    // Print tag for debugging
+    PRINTF("Authentication Tag (16 bytes):\n");
+    for (int i = 0; i < 16; i++) {
+        PRINTF("%02x ", tag[i]);
+    }
+    PRINTF("\n");
+
+    // Set up GCM decryption
+    ret = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, shared_secret, 256);
+    if (ret != 0) {
+        PRINTF("GCM key setup failed: -0x%x\n", -ret);
+        goto cleanup;
+    }
+
+    // Decrypt using GCM
+    ret = mbedtls_gcm_auth_decrypt(&gcm, data_len,
+                                   iv, 12,
+                                   NULL, 0,
+                                   tag, 16,
+                                   encrypted_data,
+                                   decrypted_data);
+
+    if (ret != 0) {
+        PRINTF("GCM decryption failed: -0x%x\n", -ret);
+
+        // Additional error diagnostics
+        PRINTF("Decryption parameters:\n");
+        PRINTF("Data length: %zu\n", data_len);
+
+        PRINTF("IV (12 bytes):\n");
+        for (int i = 0; i < 12; i++) {
+            PRINTF("%02x ", iv[i]);
+        }
+        PRINTF("\n");
+
+        PRINTF("First 16 bytes of encrypted data:\n");
+        for (int i = 0; i < 16; i++) {
+            PRINTF("%02x ", encrypted_data[i]);
+        }
+        PRINTF("\n");
+    } else {
+        *decrypted_len = data_len;
+
+        // Print decrypted data
+        PRINTF("Decrypted Data (first 16 bytes):\n");
+        for (int i = 0; i < 16 && i < *decrypted_len; i++) {
+            PRINTF("%02x ", decrypted_data[i]);
+        }
+        PRINTF("\n");
+    }
+
+cleanup:
+    mbedtls_ecdh_free(&ctx);
+    mbedtls_entropy_free(&entropy);
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+   // mbedtls_pk_free(&priv_key);
+    mbedtls_gcm_free(&gcm);
+    return ret;
+}
+void WIFI_USART_IRQHandler(void)
+{
+   // Prevent infinite processing
+   uint16_t safety_counter = 0;
+   const uint16_t MAX_ITERATIONS = 100; // Prevent infinite loop
+
+   while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART) &&
+          safety_counter++ < MAX_ITERATIONS)
+   {
+       // Read the byte
+       uint8_t receivedByte = USART_ReadByte(WIFI_USART);
+
+       // Store the byte in the buffer
+       if (bufferIndex < MAX_BUFFER_SIZE)
+       {
+           rxBuffer[bufferIndex++] = receivedByte;
+
+           // Check if we have an end marker
+           if (bufferIndex >= END_MARKER_LENGTH &&
+               memcmp(&rxBuffer[bufferIndex - END_MARKER_LENGTH],
+                     END_MARKER, END_MARKER_LENGTH) == 0)
+           {
+               // First, call original findMessage for existing logging
+               findMessage(rxBuffer, bufferIndex);
+
+               // Find start of actual encryption data (skipping LOC-RESP)
+               uint16_t dataStart = 0;
+               uint16_t dataEnd = bufferIndex - END_MARKER_LENGTH;
+
+               // Locate where LOC-RESP actually starts
+               for (uint16_t i = 0; i < bufferIndex - START_MARKER_LENGTH; i++) {
+                   if (memcmp(&rxBuffer[i], START_MARKER, START_MARKER_LENGTH) == 0) {
+                       // Skip the entire LOC-RESP marker
+                       dataStart = i + START_MARKER_LENGTH + strlen("LOC-RESP");
+                       break;
+                   }
+               }
+
+               // Sanity check
+               if (dataStart == 0 || dataEnd - dataStart < (65 + 12 + 16)) {
+                   PRINTF("Invalid message format - not enough data\r\n");
+                   bufferIndex = 0;
+                   continue;
+               }
+
+               // Calculate lengths after removing markers and LOC-RESP
+               size_t total_message_length = dataEnd - dataStart;
+
+               // Detailed hex dump of the entire message
+               PRINTF("Raw message data (%zu bytes):\n", total_message_length);
+               for (size_t i = 0; i < total_message_length; i++) {
+                   PRINTF("%02x ", rxBuffer[dataStart + i]);
+                   if ((i + 1) % 16 == 0) PRINTF("\n");
+               }
+               PRINTF("\n");
+
+               // If the total message length is too short, bail out
+               if (total_message_length < (65 + 12 + 16)) {
+                   PRINTF("Message too short for encryption components\r\n");
+                   bufferIndex = 0;
+                   continue;
+               }
+
+               // Extract components from message
+               uint8_t *message_start = rxBuffer + dataStart;
+               uint8_t *ephemeral_public = message_start;
+               uint8_t *iv = message_start + 65;
+               uint8_t *encrypted_data = message_start + 65 + 12;
+               size_t encrypted_length = total_message_length - (65 + 12);
+
+               // Additional debug prints
+               PRINTF("Ephemeral public key length: 65\n");
+               PRINTF("Detailed ephemeral public key:\n");
+               for (int i = 0; i < 65; i++) {
+                   PRINTF("%02x ", ephemeral_public[i]);
+                   if ((i + 1) % 16 == 0) PRINTF("\n");
+               }
+               PRINTF("\n");
+
+               PRINTF("IV length: 12\n");
+               PRINTF("IV data:\n");
+               for (int i = 0; i < 12; i++) {
+                   PRINTF("%02x ", iv[i]);
+               }
+               PRINTF("\n");
+
+               PRINTF("Encrypted data length: %zu\n", encrypted_length);
+               PRINTF("First 16 bytes of encrypted data:\n");
+               for (int i = 0; i < 16 && i < encrypted_length; i++) {
+                   PRINTF("%02x ", encrypted_data[i]);
+               }
+               PRINTF("\n");
+
+               // Decrypt the message
+               uint8_t decrypted_data[MAX_BUFFER_SIZE];
+               size_t decrypted_length = 0;
+
+               // Verbose error tracking
+               int ret = decrypt_with_private_key(encrypted_data, encrypted_length,
+                                                  PRV_DEV_KEY_PEM,
+                                                  ephemeral_public, 65,
+                                                  iv,
+                                                  decrypted_data, &decrypted_length);
+
+               PRINTF("Decryption return code: %d (0x%x)\n", ret, -ret);
+
+               if (ret == 0) {
+                   // Decryption successful, forward decrypted data
+                   USART_WriteBlocking(WIFI_USART2, decrypted_data, decrypted_length);
+               } else {
+                   PRINTF("Decryption failed with error: %d\r\n", ret);
+               }
+
+               // Reset buffer after processing
+               bufferIndex = 0;
+           }
+       }
+       else
+       {
+           // Buffer is full, reset it
+           bufferIndex = 0;
+       }
+   }
+
+   // If safety counter was hit, force buffer reset
+   if (safety_counter >= MAX_ITERATIONS) {
+       bufferIndex = 0;
+       PRINTF("USART Interrupt: Maximum iterations reached. Potential communication issue.\r\n");
+   }
+
+   // Clear any receive errors
+   USART_ClearStatusFlags(WIFI_USART, kUSART_RxError);
+   SDK_ISR_EXIT_BARRIER;
 }
 
 void WIFI_USART2_IRQHandler(void)

@@ -47,6 +47,8 @@ Next steps.
 #include "mbedtls/error.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
+#include "mbedtls/ecdh.h"
+#include "mbedtls/ecp.h"
 
 #define INSTANCE_ID 0
 
@@ -246,18 +248,18 @@ static void ext_adv_init(void)
     assert(rc == 0);
 }
 
-
 static void send_ble_message(uint8_t *data, size_t data_len)
 {
     const char *prefix = "LOC-RESP";
     size_t prefix_len = strlen(prefix);
     size_t total_data_len = prefix_len + data_len;
 
-    // Calculate total advertisement length 
+    // Calculate total advertisement length
     uint8_t total_adv_length = 3 + 2 + 2 + total_data_len; // Flags + header + company ID + prefix + data
 
     uint8_t *adv_data = malloc(total_adv_length);
-    if (adv_data == NULL) {
+    if (adv_data == NULL)
+    {
         ESP_LOGE(TAG, "Memory allocation failed!");
         return;
     }
@@ -281,34 +283,39 @@ static void send_ble_message(uint8_t *data, size_t data_len)
     struct os_mbuf *mbuf;
     int rc;
 
-    if (ble_gap_ext_adv_active(INSTANCE_ID)) {
+    if (ble_gap_ext_adv_active(INSTANCE_ID))
+    {
         rc = ble_gap_ext_adv_stop(INSTANCE_ID);
         assert(rc == 0);
     }
 
     mbuf = os_mbuf_get_pkthdr(&large_mbuf_pool, 0);
-    if (!mbuf) {
+    if (!mbuf)
+    {
         ESP_LOGE(TAG, "Failed to allocate mbuf!");
         free(adv_data);
         return;
     }
 
     rc = os_mbuf_append(mbuf, adv_data, total_adv_length);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         ESP_LOGE(TAG, "Failed to append to mbuf! rc=%d", rc);
         free(adv_data);
         return;
     }
 
     rc = ble_gap_ext_adv_set_data(INSTANCE_ID, mbuf);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         ESP_LOGE(TAG, "Failed to set advertisement data! rc=%d", rc);
         free(adv_data);
         return;
     }
 
     rc = ble_gap_ext_adv_start(INSTANCE_ID, 100, 0);
-    if (rc != 0) {
+    if (rc != 0)
+    {
         ESP_LOGE(TAG, "Failed to start advertising! rc=%d", rc);
         free(adv_data);
         return;
@@ -711,9 +718,9 @@ void extract_public_key()
     mbedtls_pk_context *pk = &cert.pk;
 
     // Check if it's an RSA key instead of EC
-    if (!mbedtls_pk_can_do(pk, MBEDTLS_PK_RSA))
+    if (!mbedtls_pk_can_do(pk, MBEDTLS_PK_ECKEY))
     {
-        ESP_LOGE(TAG, "Certificate does not contain an RSA public key!");
+        ESP_LOGE(TAG, "Certificate does not contain an EC public key!");
         mbedtls_x509_crt_free(&cert);
         return;
     }
@@ -733,7 +740,7 @@ void extract_public_key()
     strncpy(public_key, (const char *)buf, PUBKEY_BUFFER_SIZE - 1);
     public_key[PUBKEY_BUFFER_SIZE - 1] = '\0'; // Null terminate the string
 
-    ESP_LOGI(TAG, "Extracted RSA Public Key:\n%s", public_key);
+    ESP_LOGI(TAG, "Extracted EC Public Key:\n%s", public_key);
 
     // Clean up
     mbedtls_x509_crt_free(&cert);
@@ -745,10 +752,11 @@ void display_paisa_info(const char *url)
 
     esp_http_client_config_t config = {
         .host = "bit.ly",
-        .path = "/3HnHwEu",
+        //.path = "/3HnHwEu",
         //.path = "/4glPu0g",
         //.path = "/4hAjeaU",
         //.path = "/430XMb1",
+        .path = "/3EJadxK",
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .cert_pem = NULL,
         .skip_cert_common_name_check = true,
@@ -839,7 +847,7 @@ static void extract_and_display_url(const uint8_t *data, uint8_t length)
         }
     }
 }
-
+/*
 static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
                                    const char *public_key,
                                    uint8_t *encrypted_data, size_t *encrypted_len)
@@ -896,7 +904,229 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
     mbedtls_ctr_drbg_free(&ctr_drbg);
 
     return ret;
+}*/
+#include "mbedtls/pk.h"
+#include "mbedtls/ecdh.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/aes.h"
+#include "esp_log.h"
+
+#define TAG "ENCRYPTION"
+
+static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
+                                   const char *public_key_pem,
+                                   uint8_t *encrypted_data, size_t *encrypted_len,
+                                   uint8_t *out_ephemeral_public, // Add this
+                                   uint8_t *out_iv)               // Add this
+{
+    mbedtls_ecdh_context ctx;
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_pk_context peer_pk;
+    const char *pers = "gen_key";
+    int ret = 0;
+    uint8_t *decrypted = NULL; // Move declaration to top
+    uint8_t shared_secret[32];
+    uint8_t iv[12] = {0};
+    uint8_t tag[16];
+
+    // Init all contexts
+    mbedtls_ecdh_init(&ctx);
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    mbedtls_pk_init(&peer_pk);
+
+    // Right after your context initializations, add:
+    decrypted = (uint8_t *)malloc(data_len);
+    if (decrypted == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to allocate decryption buffer");
+        ret = -1;
+        goto cleanup;
+    }
+
+    // Seed RNG
+    ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
+                                (const unsigned char *)pers, strlen(pers));
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to seed RNG: -0x%x", -ret);
+        goto cleanup;
+    }
+
+    // Load curve
+    ret = mbedtls_ecdh_setup(&ctx, MBEDTLS_ECP_DP_SECP256R1);
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to setup ECDH: -0x%x", -ret);
+        goto cleanup;
+    }
+
+    // Generate our ephemeral keypair
+    ret = mbedtls_ecdh_gen_public(&ctx.MBEDTLS_PRIVATE(grp),
+                                  &ctx.MBEDTLS_PRIVATE(d),
+                                  &ctx.MBEDTLS_PRIVATE(Q),
+                                  mbedtls_ctr_drbg_random, &ctr_drbg);
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to generate keypair: -0x%x", -ret);
+        goto cleanup;
+    }
+
+    // Parse peer's public key from PEM
+    ret = mbedtls_pk_parse_public_key(&peer_pk, (const unsigned char *)public_key_pem,
+                                      strlen(public_key_pem) + 1);
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to parse public key: -0x%x", -ret);
+        goto cleanup;
+    }
+
+    // Extract peer's public point
+    const mbedtls_ecp_keypair *peer_keypair = mbedtls_pk_ec(peer_pk);
+    ret = mbedtls_ecdh_compute_shared(&ctx.MBEDTLS_PRIVATE(grp),
+                                      &ctx.MBEDTLS_PRIVATE(z),
+                                      &peer_keypair->MBEDTLS_PRIVATE(Q),
+                                      &ctx.MBEDTLS_PRIVATE(d),
+                                      mbedtls_ctr_drbg_random, &ctr_drbg);
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to compute shared secret: -0x%x", -ret);
+        goto cleanup;
+    }
+
+    // Use shared secret for AES-GCM encryption
+    // uint8_t shared_secret[32];
+    size_t secret_len;
+    ret = mbedtls_mpi_write_binary(&ctx.MBEDTLS_PRIVATE(z), shared_secret, sizeof(shared_secret));
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to extract shared secret: -0x%x", -ret);
+        goto cleanup;
+    }
+
+    // Encrypt data using AES-GCM
+    mbedtls_gcm_context gcm;
+    // uint8_t iv[12] = {0}; // In production, use random IV
+    // uint8_t tag[16];
+
+    mbedtls_gcm_init(&gcm);
+    ret = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, shared_secret, 256);
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to set GCM key: -0x%x", -ret);
+        goto cleanup_gcm;
+    }
+
+    ret = mbedtls_gcm_crypt_and_tag(&gcm, MBEDTLS_GCM_ENCRYPT, data_len,
+                                    iv, sizeof(iv), NULL, 0,
+                                    data, encrypted_data,
+                                    16, tag);
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to encrypt: -0x%x", -ret);
+        goto cleanup_gcm;
+    }
+
+    // Copy tag after encrypted data
+    memcpy(encrypted_data + data_len, tag, 16);
+    *encrypted_len = data_len + 16; // encrypted data + tag
+
+    ESP_LOGI(TAG, "Encryption successful");
+
+    size_t public_key_len;
+    ret = mbedtls_ecp_point_write_binary(&ctx.MBEDTLS_PRIVATE(grp),
+                                         &ctx.MBEDTLS_PRIVATE(Q),
+                                         MBEDTLS_ECP_PF_UNCOMPRESSED,
+                                         &public_key_len,
+                                         out_ephemeral_public,
+                                         65);
+
+// Diagnostic prints
+ESP_LOGI(TAG, "Ephemeral public key export:");
+ESP_LOGI(TAG, "Return code: -0x%x", -ret);
+ESP_LOGI(TAG, "Exported key length: %zu", public_key_len);
+
+// Print the first few bytes of the exported key
+ESP_LOGI(TAG, "First 8 bytes of ephemeral public key:");
+for (int i = 0; i < 65; i++) {
+    printf("%02x ", out_ephemeral_public[i]);
 }
+printf("\n");
+
+                                         // Copy the IV
+    memcpy(out_iv, iv, 12);
+
+    // Print shared secret in hex
+    ESP_LOGI(TAG, "Shared secret:");
+    for (int i = 0; i < 32; i++)
+    {
+        printf("%02x", shared_secret[i]);
+    }
+    printf("\n");
+
+    // Print encrypted data in hex
+    ESP_LOGI(TAG, "Encrypted data + tag (%d bytes):", *encrypted_len);
+    for (int i = 0; i < *encrypted_len; i++)
+    {
+        printf("%02x", encrypted_data[i]);
+    }
+    printf("\n");
+
+    // Separate the tag from encrypted data for decryption
+    // uint8_t *decrypted = (uint8_t*)malloc(data_len);
+    // if (decrypted == NULL) {
+    //    ESP_LOGE(TAG, "Failed to allocate decryption buffer");
+    //    ret = -1;
+    //     goto cleanup;
+    // }
+
+    // Extract tag from the end of encrypted data
+    memcpy(tag, encrypted_data + data_len, 16);
+
+    // Decrypt using only the encrypted portion
+    ret = mbedtls_gcm_auth_decrypt(&gcm, data_len,
+                                   iv, sizeof(iv),
+                                   NULL, 0,
+                                   tag, 16,
+                                   encrypted_data, // Just the encrypted portion
+                                   decrypted);
+
+    if (ret == 0)
+    {
+        ESP_LOGI(TAG, "Decryption successful");
+        ESP_LOGI(TAG, "Decrypted text: ");
+        for (int i = 0; i < data_len; i++)
+        {
+            printf("%c", decrypted[i]);
+        }
+        printf("\n");
+
+        ESP_LOGI(TAG, "Decrypted data (hex):");
+        for (int i = 0; i < data_len; i++)
+        {
+            printf("%02x", decrypted[i]);
+        }
+        printf("\n");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Decryption failed: -0x%x", -ret);
+    }
+
+cleanup_gcm:
+    mbedtls_gcm_free(&gcm);
+cleanup:
+    if (decrypted)
+        free(decrypted); // Add this line
+    mbedtls_ecdh_free(&ctx);
+    mbedtls_entropy_free(&entropy);
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+    mbedtls_pk_free(&peer_pk);
+    return ret;
+}
+
 static int ble_gap_event(struct ble_gap_event *event, void *arg)
 {
     switch (event->type)
@@ -935,7 +1165,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
             // PRINT out the manifest + the announcement information (neatly)
             if (strlen(certificate_of_device) > 0)
             {
-
+                extract_public_key();
                 // Temporarily stop scanning while we send our response
                 ble_gap_disc_cancel();
 
@@ -962,9 +1192,9 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 sts_iv.iv2 = *((uint32_t *)&iv_string[8]); // LLO2
                 sts_iv.iv3 = *((uint32_t *)&iv_string[9]); // O202
 
-                                // Generate random values for key and IV using ESP32's hardware RNG
-                esp_fill_random(&sts_key, sizeof(sts_key));
-                esp_fill_random(&sts_iv, sizeof(sts_iv));
+                // Generate random values for key and IV using ESP32's hardware RNG
+                // esp_fill_random(&sts_key, sizeof(sts_key));
+                // esp_fill_random(&sts_iv, sizeof(sts_iv));
 
                 ESP_LOGI(TAG, "STS KEY: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
                          sts_key.key0, sts_key.key1, sts_key.key2, sts_key.key3);
@@ -978,7 +1208,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                          aes_key.key4, aes_key.key5, aes_key.key6, aes_key.key7);
 
                 // Send Announcement data over to UWB board.
-               // send_uart_data(debug_disc->data, total_length);
+                // send_uart_data(debug_disc->data, total_length);
 
                 // Create and send STS and AES data over UART
                 uint8_t crypto_data[64]; // Increased to hold both STS and AES data
@@ -987,8 +1217,43 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &aes_key, sizeof(aes_key));
                 send_uart_data(crypto_data, sizeof(crypto_data));
 
-               // send_loc_resp();
+                /*
+                uint8_t encrypted_sts_data[256]; // Adjust size as needed
+                size_t encrypted_length = sizeof(encrypted_sts_data);
+                // int ret = encrypt_with_ecdh(crypto_data, sizeof(crypto_data),
+                //                             public_key,
+                //                             encrypted_sts_data, &encrypted_length);
+                int ret = encrypt_with_public_key(crypto_data, sizeof(crypto_data),
+                                                  public_key,
+                                                  encrypted_sts_data, &encrypted_length);
+                // send_loc_resp();
                 send_ble_message(crypto_data, sizeof(crypto_data));
+                */
+                uint8_t encrypted_sts_data[256];
+                size_t encrypted_length = sizeof(encrypted_sts_data);
+                uint8_t complete_message[256 + 65 + 12];
+                uint8_t ephemeral_public[65];
+                uint8_t iv[12];
+
+                // Updated function call with new parameters
+                int ret = encrypt_with_public_key(crypto_data, sizeof(crypto_data),
+                                                  public_key,
+                                                  encrypted_sts_data, &encrypted_length,
+                                                  ephemeral_public, // Pass buffer for public key
+                                                  iv);              // Pass buffer for IV
+
+                if (ret == 0)
+                {
+                    size_t total_length = 0;
+                    memcpy(complete_message, ephemeral_public, 65);
+                    total_length += 65;
+                    memcpy(complete_message + total_length, iv, 12);
+                    total_length += 12;
+                    memcpy(complete_message + total_length, encrypted_sts_data, encrypted_length);
+                    total_length += encrypted_length;
+
+                    send_ble_message(complete_message, total_length);
+                }
 
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 ble_scanner_init();

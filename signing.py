@@ -3,13 +3,9 @@ from codecs import encode, decode
 from mbedtls import pk
 from hashlib import sha256
 
-# Read device certificate and convert newlines to \n
+# Read device certificate (contains key for both ECDSA and ECDH)
 with open('keys/secp256r1/dev/crt.pem', 'r') as f:
     device_cert = f.read().strip().replace('\n', '\\n')
-
-# Read device public key and convert newlines to \n
-with open('keys/secp256r1/dev/pub_2.pem', 'r') as f:
-    device_pubkey = f.read().strip().replace('\n', '\\n')
 
 # Base manifest as a raw string
 manifest_content = "device_id:19682938\n" + \
@@ -24,8 +20,7 @@ manifest_content = "device_id:19682938\n" + \
     "user_manual_link:null\n" + \
     "location:null\n" + \
     "description:sample application, blinking led\n" + \
-    "certificate_of_device:" + device_cert + "\\n\n" + \
-    "pk_of_dev:" + device_pubkey + "\\n\n"
+    "certificate_of_device:" + device_cert + "\\n\n"  # Certificate contains the key for both purposes
 
 def signMessage(msg, key_file):
     ecc = pk.ECC()
