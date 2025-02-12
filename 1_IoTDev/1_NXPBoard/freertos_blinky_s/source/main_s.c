@@ -60,6 +60,8 @@
 #include "fsl_iap.h"
 #include "mbedtls/gcm.h"
 #include "mbedtls/cipher.h"
+#include "mbedtls/platform.h"
+#include "mbedtls/error.h"
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -341,16 +343,15 @@ void WIFI_USART_IRQHandler(void)
 }*/
 
 static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encrypted_len,
-                                    const char *private_key_pem,
-                                    const uint8_t *peer_public_key, size_t peer_public_key_len,
-                                    const uint8_t *iv,
-                                    uint8_t *decrypted_data, size_t *decrypted_len) {
+                                  const char *private_key_pem,
+                                  const uint8_t *peer_public_key, size_t peer_public_key_len,
+                                  const uint8_t *iv,
+                                  uint8_t *decrypted_data, size_t *decrypted_len) {
     mbedtls_ecdh_context ctx;
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_pk_context peer_pk;
-    mbedtls_gcm_context gcm;
-    const char *pers = "ecdh_decrypt";
+    mbedtls_pk_context our_pk;
+    const char *pers = "decrypt_key";
     int ret = 0;
     uint8_t shared_secret[32];
     uint8_t tag[16];
@@ -359,143 +360,117 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
     mbedtls_ecdh_init(&ctx);
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_pk_init(&peer_pk);
-    mbedtls_gcm_init(&gcm);
+    mbedtls_pk_init(&our_pk);
 
     // Seed RNG
     ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
                                 (const unsigned char *)pers, strlen(pers));
     if (ret != 0) {
-        PRINTF("RNG seed failed: -0x%x\n", -ret);
+        PRINTF("Failed to seed RNG: -0x%x\n", -ret);
         goto cleanup;
     }
 
-    // Parse private key
-   // ret = mbedtls_pk_parse_key(&priv_key,
-   //                           (const unsigned char *)private_key_pem,
-    //                          strlen(private_key_pem) + 1,
-    //                          NULL,
-    //                          0);
-    //if (ret != 0) {
-    //    PRINTF("Private key parsing failed: -0x%x\n", -ret);
-   ////     goto cleanup;
-   // }
+    // Load our private key
+    ret = mbedtls_pk_parse_key(&our_pk, (const unsigned char *)private_key_pem,
+                              strlen(private_key_pem) + 1, NULL, 0);
+    if (ret != 0) {
+        PRINTF("Failed to parse private key: -0x%x\n", -ret);
+        goto cleanup;
+    }
 
-    // Setup ECDH with specific curve
+    // Setup ECDH with the same curve
     ret = mbedtls_ecdh_setup(&ctx, MBEDTLS_ECP_DP_SECP256R1);
     if (ret != 0) {
-        PRINTF("ECDH setup failed: -0x%x\n", -ret);
+        PRINTF("Failed to setup ECDH: -0x%x\n", -ret);
         goto cleanup;
     }
 
-    // Validate public key format
-    if (peer_public_key_len != 65 || peer_public_key[0] != 0x04) {
-        PRINTF("Invalid public key format. Length: %zu, First byte: 0x%02x\n",
-               peer_public_key_len, peer_public_key[0]);
-        ret = MBEDTLS_ERR_ECP_BAD_INPUT_DATA;
-        goto cleanup;
-    }
-    PRINTF("Ephemeral Public Key (65 bytes):");
-    for (int i = 0; i < 65; i++) {
-    	PRINTF("%02x ", peer_public_key[i]);
-    }
-    PRINTF("\n");
-    // Explicitly read public key
-    ret = mbedtls_pk_parse_public_key(&peer_pk, peer_public_key, peer_public_key_len);
+    // Load our private key parameters
+    const mbedtls_ecp_keypair *our_keypair = mbedtls_pk_ec(our_pk);
+    ret = mbedtls_ecdh_get_params(&ctx, our_keypair, MBEDTLS_ECDH_OURS);
     if (ret != 0) {
-        PRINTF("Failed to read peer public key: -0x%x\n", -ret);
+        PRINTF("Failed to load our params: -0x%x\n", -ret);
         goto cleanup;
     }
 
-    // Load our private key for shared secret computation
-  //  const mbedtls_ecp_keypair *our_keypair = mbedtls_pk_ec(priv_key);
-
-    // Compute shared secret
-    //ret = mbedtls_ecdh_compute_shared(&ctx.grp, &ctx.z, &ctx.Q, &our_keypair->d,
-    //                                 mbedtls_ctr_drbg_random, &ctr_drbg);
-   // if (ret != 0) {
-   //     PRINTF("Shared secret computation failed: -0x%x\n", -ret);
-   //     goto cleanup;
-   // }
-
-    // Extract shared secret
-    ret = mbedtls_mpi_write_binary(&ctx.z, shared_secret, sizeof(shared_secret));
+    // Load peer's ephemeral public key directly from binary
+    ret = mbedtls_ecp_point_read_binary(&ctx.grp, &ctx.Qp,
+                                       peer_public_key, peer_public_key_len);
     if (ret != 0) {
-        PRINTF("Failed to extract shared secret: -0x%x\n", -ret);
+        PRINTF("Failed to load peer public key point: -0x%x\n", -ret);
         goto cleanup;
     }
 
-    // Print shared secret for debugging
-    PRINTF("Shared Secret (32 bytes):\n");
-    for (int i = 0; i < 32; i++) {
-        PRINTF("%02x ", shared_secret[i]);
-        if ((i + 1) % 16 == 0) PRINTF("\n");
+    // Calculate shared secret
+    ret = mbedtls_ecdh_calc_secret(&ctx, &ret, shared_secret, sizeof(shared_secret),
+                                  mbedtls_ctr_drbg_random, &ctr_drbg);
+    if (ret != 0) {
+        PRINTF("Failed to compute shared secret: -0x%x\n", -ret);
+        goto cleanup;
     }
-    PRINTF("\n");
 
-    // Separate encrypted data and tag
-    size_t data_len = encrypted_len - 16;
+    // Setup AES-GCM
+    mbedtls_gcm_context gcm;
+    mbedtls_gcm_init(&gcm);
 
-    // Extract tag from end of encrypted data
-    memcpy(tag, encrypted_data + data_len, 16);
-
-    // Print tag for debugging
-    PRINTF("Authentication Tag (16 bytes):\n");
-    for (int i = 0; i < 16; i++) {
-        PRINTF("%02x ", tag[i]);
-    }
-    PRINTF("\n");
-
-    // Set up GCM decryption
     ret = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, shared_secret, 256);
     if (ret != 0) {
-        PRINTF("GCM key setup failed: -0x%x\n", -ret);
-        goto cleanup;
+        PRINTF("Failed to set GCM key: -0x%x\n", -ret);
+        goto cleanup_gcm;
     }
 
-    // Decrypt using GCM
-    ret = mbedtls_gcm_auth_decrypt(&gcm, data_len,
-                                   iv, 12,
-                                   NULL, 0,
-                                   tag, 16,
-                                   encrypted_data,
-                                   decrypted_data);
+    // The last 16 bytes are the tag
+    *decrypted_len = encrypted_len - 16;
+    memcpy(tag, encrypted_data + *decrypted_len, 16);
+
+    // Decrypt and verify
+    ret = mbedtls_gcm_auth_decrypt(&gcm, *decrypted_len,
+                                  iv, 12,
+                                  NULL, 0,
+                                  tag, 16,
+                                  encrypted_data, // Just the encrypted portion
+                                  decrypted_data + START_MARKER_LENGTH);  // Leave space for start marker
 
     if (ret != 0) {
-        PRINTF("GCM decryption failed: -0x%x\n", -ret);
-
-        // Additional error diagnostics
-        PRINTF("Decryption parameters:\n");
-        PRINTF("Data length: %zu\n", data_len);
-
-        PRINTF("IV (12 bytes):\n");
-        for (int i = 0; i < 12; i++) {
-            PRINTF("%02x ", iv[i]);
-        }
-        PRINTF("\n");
-
-        PRINTF("First 16 bytes of encrypted data:\n");
-        for (int i = 0; i < 16; i++) {
-            PRINTF("%02x ", encrypted_data[i]);
-        }
-        PRINTF("\n");
-    } else {
-        *decrypted_len = data_len;
-
-        // Print decrypted data
-        PRINTF("Decrypted Data (first 16 bytes):\n");
-        for (int i = 0; i < 16 && i < *decrypted_len; i++) {
-            PRINTF("%02x ", decrypted_data[i]);
-        }
-        PRINTF("\n");
+        PRINTF("Decryption failed: -0x%x\n", -ret);
+        goto cleanup_gcm;
     }
 
+    // Add markers
+    memcpy(decrypted_data, START_MARKER, START_MARKER_LENGTH);
+    memcpy(decrypted_data + START_MARKER_LENGTH + *decrypted_len, END_MARKER, END_MARKER_LENGTH);
+
+    // Update total length to include markers
+    *decrypted_len = *decrypted_len + START_MARKER_LENGTH + END_MARKER_LENGTH;
+
+    PRINTF("Decryption successful\n");
+
+    // Print final data with markers
+    PRINTF("Final data with markers (hex):\n");
+    for (int i = 0; i < *decrypted_len; i++) {
+        PRINTF("%02x", decrypted_data[i]);
+    }
+    PRINTF("\n");
+
+    PRINTF("Final data with markers (ASCII):\n");
+    for (int i = 0; i < *decrypted_len; i++) {
+        PRINTF("%c", decrypted_data[i]);
+    }
+    PRINTF("\n");
+
+    // Debug output for shared secret
+    PRINTF("Shared secret:\n");
+    for (int i = 0; i < 32; i++) {
+        PRINTF("%02x", shared_secret[i]);
+    }
+    PRINTF("\n");
+cleanup_gcm:
+    mbedtls_gcm_free(&gcm);
 cleanup:
     mbedtls_ecdh_free(&ctx);
     mbedtls_entropy_free(&entropy);
     mbedtls_ctr_drbg_free(&ctr_drbg);
-   // mbedtls_pk_free(&priv_key);
-    mbedtls_gcm_free(&gcm);
+    mbedtls_pk_free(&our_pk);
     return ret;
 }
 void WIFI_USART_IRQHandler(void)
@@ -547,10 +522,17 @@ void WIFI_USART_IRQHandler(void)
                size_t total_message_length = dataEnd - dataStart;
 
                // Detailed hex dump of the entire message
-               PRINTF("Raw message data (%zu bytes):\n", total_message_length);
+               // Option 1
+               PRINTF("Raw message data (%lu bytes):\n", (unsigned long)total_message_length);
+
+               // Option 2
+               PRINTF("Raw message data (%zd bytes):\n", total_message_length);
+
+               // Option 3
+               PRINTF("Raw message data (%d bytes):\n", (int)total_message_length);
                for (size_t i = 0; i < total_message_length; i++) {
                    PRINTF("%02x ", rxBuffer[dataStart + i]);
-                   if ((i + 1) % 16 == 0) PRINTF("\n");
+                   //if ((i + 1) % 16 == 0) PRINTF("\n");
                }
                PRINTF("\n");
 
@@ -573,7 +555,7 @@ void WIFI_USART_IRQHandler(void)
                PRINTF("Detailed ephemeral public key:\n");
                for (int i = 0; i < 65; i++) {
                    PRINTF("%02x ", ephemeral_public[i]);
-                   if ((i + 1) % 16 == 0) PRINTF("\n");
+                   //if ((i + 1) % 16 == 0) PRINTF("\n");
                }
                PRINTF("\n");
 
@@ -607,8 +589,9 @@ void WIFI_USART_IRQHandler(void)
                if (ret == 0) {
                    // Decryption successful, forward decrypted data
                    USART_WriteBlocking(WIFI_USART2, decrypted_data, decrypted_length);
-               } else {
-                   PRINTF("Decryption failed with error: %d\r\n", ret);
+               }
+            else {
+                   PRINTF("Decryption failed with error: %d\r\n");//, ret);
                }
 
                // Reset buffer after processing

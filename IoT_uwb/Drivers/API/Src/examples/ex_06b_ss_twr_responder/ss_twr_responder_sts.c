@@ -116,7 +116,7 @@ static dwt_sts_cp_iv_t cp_iv = { 0x1F9A3DE4, 0xD37EC3CA, 0xC44FA8FB, 0x362EEB34 
 #define UART_TX_PIN 6   // P0.06
 #define UART_BAUDRATE NRF_UART_BAUDRATE_115200
 #define RX_BUF_SIZE 256
-#define START_MARKER "PAISASTART:LOC-RESP"
+#define START_MARKER "PAISASTART:"
 #define END_MARKER ":PAISAEND"
 
 static nrf_drv_uart_t uart_instance = NRF_DRV_UART_INSTANCE(0);
