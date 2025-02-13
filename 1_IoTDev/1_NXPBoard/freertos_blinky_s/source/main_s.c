@@ -167,6 +167,8 @@ ctimer_callback_t ctimer_callback_table[] = {
 
 mbedtls_pk_context private_key = {0, };
 mbedtls_ctr_drbg_context ctr_drbg = {0, };
+static uint8_t last_sent_nonce[NONCE_SIZE] = {0};
+static uint8_t previous_sent_nonce[NONCE_SIZE] = {0};
 
 /*-----------------------------------------------------------*/
 
@@ -477,7 +479,7 @@ void WIFI_USART_IRQHandler(void)
 {
    // Prevent infinite processing
    uint16_t safety_counter = 0;
-   const uint16_t MAX_ITERATIONS = 300; // Prevent infinite loop
+   const uint16_t MAX_ITERATIONS = 50; // Prevent infinite loop
 
    while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART) &&
           safety_counter++ < MAX_ITERATIONS)
@@ -511,8 +513,14 @@ void WIFI_USART_IRQHandler(void)
                    }
                }
 
+               PRINTF("Raw message starting at offset %d:\n", dataStart);
+               for(int i = 0; i < 32; i++) {
+                   PRINTF("%02x ", rxBuffer[dataStart + i]);
+               }
+               PRINTF("\n");
+
                // Sanity check
-               if (dataStart == 0 || dataEnd - dataStart < (65 + 12 + 16)) {
+               if (dataStart == 0 || dataEnd - dataStart < (32 + 65 + 12 + 16)) {
                    PRINTF("Invalid message format - not enough data\r\n");
                    bufferIndex = 0;
                    continue;
@@ -543,19 +551,41 @@ void WIFI_USART_IRQHandler(void)
                    continue;
                }
 
-               // Extract components from message
+               // Extract components from message - now including nonce
                uint8_t *message_start = rxBuffer + dataStart;
-               uint8_t *ephemeral_public = message_start;
-               uint8_t *iv = message_start + 65;
-               uint8_t *encrypted_data = message_start + 65 + 12;
-               size_t encrypted_length = total_message_length - (65 + 12);
+               uint8_t *nonce = message_start;  // First 32 bytes - just for printing
+               uint8_t *ephemeral_public = message_start + 32;  // Next 65 bytes - used for decryption
+               uint8_t *iv = message_start + 32 + 65;  // Next 12 bytes - used for decryption
+               uint8_t *encrypted_data = message_start + 32 + 65 + 12;  // Rest is encrypted data
+               size_t encrypted_length = total_message_length - (32 + 65 + 12);
 
-               // Additional debug prints
+               if (memcmp(nonce, last_sent_nonce, NONCE_SIZE) != 0 &&
+                   memcmp(nonce, previous_sent_nonce, NONCE_SIZE) != 0) {
+                   PRINTF("Nonce mismatch - breaking\n");
+                   PRINTF("Received nonce: ");
+                   for (int i = 0; i < 32; i++) {
+                       PRINTF("%02x ", nonce[i]);
+                   }
+                   PRINTF("\nExpected recent nonce: ");
+                   for (int i = 0; i < 32; i++) {
+                       PRINTF("%02x ", last_sent_nonce[i]);
+                   }
+                   PRINTF("\nExpected previous nonce: ");
+                   for (int i = 0; i < 32; i++) {
+                       PRINTF("%02x ", previous_sent_nonce[i]);
+                   }
+                   PRINTF("\n");
+                   bufferIndex = 0;
+                   return;
+               }
+
+               PRINTF("Nonce match - continuing with decryption\n");
+
+               // Continue with normal decryption using ephemeral_public, iv, and encrypted_data
                PRINTF("Ephemeral public key length: 65\n");
                PRINTF("Detailed ephemeral public key:\n");
                for (int i = 0; i < 65; i++) {
                    PRINTF("%02x ", ephemeral_public[i]);
-                   //if ((i + 1) % 16 == 0) PRINTF("\n");
                }
                PRINTF("\n");
 
@@ -654,7 +684,7 @@ void syncReq(uint8_t *req_buffer)
 	// The last 6 bytes, "MSGEND" is for the network module to differentiate this from syncAck.
 
 	ret = mbedtls_ctr_drbg_random(&ctr_drbg, n1_dev, sizeof(n1_dev));
-
+	//memcpy(last_sent_nonce, n_dev, NONCE_SIZE);
 	memcpy(req_buffer+msg_len, &id_dev, ID_SIZE);
 	msg_len += ID_SIZE;
 	memcpy(req_buffer+msg_len, n1_dev, NONCE_SIZE);
@@ -871,7 +901,9 @@ void announcement()
 	// signature: [n_dev(32) || time_cur (4) from Dev || id_dev(4) || H(M_SRV_URL)(32) || attest_result(1) || time_attest(4)]
 
 	ret = mbedtls_ctr_drbg_random(&ctr_drbg, n_dev, NONCE_SIZE);
+	memcpy(previous_sent_nonce, last_sent_nonce, NONCE_SIZE);
 
+	memcpy(last_sent_nonce, n_dev, NONCE_SIZE);
 	memcpy(msg+msg_len, n_dev, NONCE_SIZE);
 	msg_len += NONCE_SIZE;
 	memcpy(msg+msg_len, &curTs, TIME_SIZE);

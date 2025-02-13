@@ -60,6 +60,7 @@ static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
 static int s_retry_num = 0;
+static uint8_t saved_n_dev[32] = {0};
 
 // Configure the maximum advertisement size
 #define MAX_ADV_DATA_LEN 255 // Maximum extended advertisement data length
@@ -399,7 +400,85 @@ static void send_loc_resp(void)
     free(adv_data);
     ESP_LOGI(TAG, "LOC-RESP advertisement started");
 }
+static void print_adv_data(const uint8_t *data, uint16_t length)
+{
+    ESP_LOGI(TAG, "\n=== Message Components Breakdown ===");
 
+    // Start from beginning for n_dev
+    int offset = 7 + 9; // Skip BLE header and LOC-PAISA
+
+    // n_dev (32 bytes)
+    ESP_LOGI(TAG, "n_dev (32 bytes): ");
+    for (int i = 0; i < 32; i++)
+    {
+        printf("%02X ", data[offset + i]);
+        saved_n_dev[i] = data[offset + i];
+    }
+    printf("\n");
+    offset += 32;
+
+    // curTS (4 bytes)
+    uint32_t curTs = data[offset] | (data[offset + 1] << 8) |
+                     (data[offset + 2] << 16) | (data[offset + 3] << 24);
+    ESP_LOGI(TAG, "curTS (4 bytes): %02X %02X %02X %02X (Decimal: %lu)",
+             data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+             (unsigned long)curTs);
+    offset += 4;
+
+    // Calculate signature length and print with actual size
+    int sig_start = offset;
+    int sig_end = length - 6 - data[length - 6];
+    int sig_len = sig_end - sig_start;
+    ESP_LOGI(TAG, "signature (%d bytes): ", sig_len);
+    for (int i = sig_start; i < sig_end; i++)
+    {
+        printf("%02X ", data[i]);
+    }
+    printf("\n");
+
+    // Print URL
+    uint8_t url_len = data[length - 6];
+    ESP_LOGI(TAG, "M_SRV_URL (%d bytes): ", url_len);
+    for (int i = 0; i < url_len; i++)
+    {
+        printf("%c", data[length - 6 - url_len + i]);
+    }
+    printf("\n");
+
+    // url_len
+    ESP_LOGI(TAG, "m_srv_url_len (1 byte): %02X (Decimal: %u)", url_len, url_len);
+
+    // attest_result
+    ESP_LOGI(TAG, "attest_result (1 byte): %02X", data[length - 5]);
+
+    // time_attest
+    uint32_t time_attest = data[length - 4] | (data[length - 3] << 8) |
+                           (data[length - 2] << 16) | (data[length - 1] << 24);
+    ESP_LOGI(TAG, "time_attest (4 bytes): %02X %02X %02X %02X (Decimal: %lu)",
+             data[length - 4], data[length - 3], data[length - 2], data[length - 1],
+             (unsigned long)time_attest);
+
+    ESP_LOGI(TAG, "\n=== Signature Components Breakdown ===");
+    ESP_LOGI(TAG, "The signature was generated over:");
+    ESP_LOGI(TAG, "- n_dev (32 bytes)");
+    ESP_LOGI(TAG, "- time_cur (4 bytes)");
+    ESP_LOGI(TAG, "- id_dev (4 bytes): %lu", 19682938UL);
+    ESP_LOGI(TAG, "- H(M_SRV_URL) (32 bytes)");
+    ESP_LOGI(TAG, "- attest_result (1 byte)");
+    ESP_LOGI(TAG, "- time_attest (4 bytes)");
+
+    // Print complete raw message
+    ESP_LOGI(TAG, "\n=== Complete Raw Message ===");
+    ESP_LOGI(TAG, "Full message (length %d): ", length);
+    for (int i = 0; i < length; i++)
+    {
+        printf("%02X ", data[i]);
+        if ((i + 1) % 16 == 0)
+            printf("\n");
+    }
+    printf("\n");
+}
+/*
 // Function to print advertisement data in a readable format
 static void print_adv_data(const uint8_t *data, uint16_t length)
 {
@@ -454,7 +533,7 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
         }
         printf("\n");
     }
-}
+}*/
 
 static void ble_scanner_init(void)
 {
@@ -1143,7 +1222,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
 
             uint8_t total_length = debug_disc->data[3];
             ESP_LOGI(TAG, "Processing advertisement with length: %d", total_length);
-            print_adv_data(debug_disc->data, total_length);
+            print_adv_data(debug_disc->data, total_length + 4);
 
             // Log the sender's address
             char addr_str[18];
@@ -1217,11 +1296,11 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 // send_uart_data(debug_disc->data, total_length);
 
                 // Create and send STS and AES data over UART
-                //uint8_t crypto_data[64]; // Increased to hold both STS and AES data
-                //memcpy(crypto_data, &sts_key, sizeof(sts_key));
-                //memcpy(crypto_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
-                //memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &aes_key, sizeof(aes_key));
-                //send_uart_data(crypto_data, sizeof(crypto_data));
+                // uint8_t crypto_data[64]; // Increased to hold both STS and AES data
+                // memcpy(crypto_data, &sts_key, sizeof(sts_key));
+                // memcpy(crypto_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
+                // memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &aes_key, sizeof(aes_key));
+                // send_uart_data(crypto_data, sizeof(crypto_data));
 
                 uint8_t crypto_data[36]; // 16 (STS key) + 16 (STS IV) + 2 (src_addr) + 2 (dst_addr)
                 memcpy(crypto_data, &sts_key, sizeof(sts_key));
@@ -1244,7 +1323,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 */
                 uint8_t encrypted_sts_data[256];
                 size_t encrypted_length = sizeof(encrypted_sts_data);
-                uint8_t complete_message[256 + 65 + 12];
+                uint8_t complete_message[256 + 65 + 12 + 32];
                 uint8_t ephemeral_public[65];
                 uint8_t iv[12];
 
@@ -1258,13 +1337,15 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 if (ret == 0)
                 {
                     size_t total_length = 0;
-                    memcpy(complete_message, ephemeral_public, 65);
+                    memcpy(complete_message, saved_n_dev, 32);  // Start with n_dev
+                    total_length += 32;
+                    memcpy(complete_message + total_length, ephemeral_public, 65);
                     total_length += 65;
                     memcpy(complete_message + total_length, iv, 12);
                     total_length += 12;
                     memcpy(complete_message + total_length, encrypted_sts_data, encrypted_length);
                     total_length += encrypted_length;
-
+                
                     send_ble_message(complete_message, total_length);
                 }
 
