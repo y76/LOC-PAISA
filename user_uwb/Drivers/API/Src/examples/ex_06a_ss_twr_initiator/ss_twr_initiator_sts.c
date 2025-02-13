@@ -202,8 +202,8 @@ void findMessage(const uint8_t* buffer, uint16_t length) {
 
 /* Function to update STS key and IV from received data */
 void update_sts_key_iv(const uint8_t* data, uint16_t length) {
-    if (length < 32) {
-        printf("Not enough data for key and IV update\n");
+    if (length < 36) {  // Updated from 32 to 36 to include src/dst addresses
+        printf("Not enough data for key, IV, and addresses update\n");
         return;
     }
 
@@ -219,13 +219,26 @@ void update_sts_key_iv(const uint8_t* data, uint16_t length) {
     cp_iv.iv2 = (data[24] << 24) | (data[25] << 16) | (data[26] << 8) | data[27];
     cp_iv.iv3 = (data[28] << 24) | (data[29] << 16) | (data[30] << 8) | data[31];
 
+    // Update addresses in tx_poll_msg (when we send the poll)
+    tx_poll_msg[5] = data[34];  // Destination address high byte
+    tx_poll_msg[6] = data[35];  // Destination address low byte
+    tx_poll_msg[7] = data[32];  // Source address high byte
+    tx_poll_msg[8] = data[33];  // Source address low byte
+
+    // Update addresses in rx_resp_msg (for the response we expect to receive)
+    rx_resp_msg[5] = data[32];  // Destination address = original source (us)
+    rx_resp_msg[6] = data[33];  // Destination address = original source (us)
+    rx_resp_msg[7] = data[34];  // Source address = original destination (them)
+    rx_resp_msg[8] = data[35];  // Source address = original destination (them)
+
     printf("Updated STS key and IV:\n");
     printf("Key: %08lX %08lX %08lX %08lX\n", 
            cp_key.key0, cp_key.key1, cp_key.key2, cp_key.key3);
     printf("IV: %08lX %08lX %08lX %08lX\n", 
            cp_iv.iv0, cp_iv.iv1, cp_iv.iv2, cp_iv.iv3);
+    printf("Updated addresses - Src: %02X%02X, Dst: %02X%02X\n",
+           data[32], data[33], data[34], data[35]);
 }
-
 /* UART event handler */
 void uart_event_handler(nrf_drv_uart_event_t *p_event, void *p_context)
 {
@@ -515,6 +528,23 @@ dwt_setpdoamode(DWT_PDOA_M3);
                 else
                 {
                     errors[BAD_FRAME_ERR_IDX] += 1;
+                     // Print the received vs expected frame contents
+    printf("Frame comparison failed!\n");
+    printf("Received frame:  ");
+    for (int i = 0; i < ALL_MSG_COMMON_LEN; i++) {
+        printf("%02X ", rx_buffer[i]);
+    }
+    printf("\nExpected frame: ");
+    for (int i = 0; i < ALL_MSG_COMMON_LEN; i++) {
+        printf("%02X ", rx_resp_msg[i]);
+    }
+    printf("\nMismatch at byte(s): ");
+    for (int i = 0; i < ALL_MSG_COMMON_LEN; i++) {
+        if (rx_buffer[i] != rx_resp_msg[i]) {
+            printf("%d ", i);
+        }
+    }
+    printf("\n");
                 }
             }
             else

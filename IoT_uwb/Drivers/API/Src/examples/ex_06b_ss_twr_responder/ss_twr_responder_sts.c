@@ -183,8 +183,8 @@ void findMessage(const uint8_t* buffer, uint16_t length) {
 
 /* Function to update STS key and IV from received data */
 void update_sts_key_iv(const uint8_t* data, uint16_t length) {
-    if (length < 32) {
-        printf("Not enough data for key and IV update\n");
+    if (length < 36) {  // Updated from 32 to 36 to include src/dst addresses
+        printf("Not enough data for key, IV, and addresses update\n");
         return;
     }
 
@@ -200,13 +200,28 @@ void update_sts_key_iv(const uint8_t* data, uint16_t length) {
     cp_iv.iv2 = (data[24] << 24) | (data[25] << 16) | (data[26] << 8) | data[27];
     cp_iv.iv3 = (data[28] << 24) | (data[29] << 16) | (data[30] << 8) | data[31];
 
+    // Update source and destination addresses in rx_poll_msg
+    // Source address (bytes 32-33 from received data)
+    rx_poll_msg[7] = data[32];  // Source address high byte
+    rx_poll_msg[8] = data[33];  // Source address low byte
+    // Destination address (bytes 34-35 from received data)
+    rx_poll_msg[5] = data[34];  // Destination address high byte
+    rx_poll_msg[6] = data[35];  // Destination address low byte
+
+    // Update source and destination addresses in tx_resp_msg (swapped since it's responding)
+    tx_resp_msg[7] = data[34];  // Source address = original destination
+    tx_resp_msg[8] = data[35];  // Source address = original destination
+    tx_resp_msg[5] = data[32];  // Destination address = original source
+    tx_resp_msg[6] = data[33];  // Destination address = original source
+
     printf("Updated STS key and IV:\n");
     printf("Key: %08lX %08lX %08lX %08lX\n", 
            cp_key.key0, cp_key.key1, cp_key.key2, cp_key.key3);
     printf("IV: %08lX %08lX %08lX %08lX\n", 
            cp_iv.iv0, cp_iv.iv1, cp_iv.iv2, cp_iv.iv3);
+    printf("Updated addresses - Src: %02X%02X, Dst: %02X%02X\n",
+           data[32], data[33], data[34], data[35]);
 }
-
 /* UART event handler */
 void uart_event_handler(nrf_drv_uart_event_t *p_event, void *p_context)
 {

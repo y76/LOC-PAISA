@@ -477,7 +477,7 @@ void WIFI_USART_IRQHandler(void)
 {
    // Prevent infinite processing
    uint16_t safety_counter = 0;
-   const uint16_t MAX_ITERATIONS = 100; // Prevent infinite loop
+   const uint16_t MAX_ITERATIONS = 300; // Prevent infinite loop
 
    while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART) &&
           safety_counter++ < MAX_ITERATIONS)

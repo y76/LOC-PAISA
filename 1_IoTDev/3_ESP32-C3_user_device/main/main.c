@@ -1043,19 +1043,20 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
                                          out_ephemeral_public,
                                          65);
 
-// Diagnostic prints
-ESP_LOGI(TAG, "Ephemeral public key export:");
-ESP_LOGI(TAG, "Return code: -0x%x", -ret);
-ESP_LOGI(TAG, "Exported key length: %zu", public_key_len);
+    // Diagnostic prints
+    ESP_LOGI(TAG, "Ephemeral public key export:");
+    ESP_LOGI(TAG, "Return code: -0x%x", -ret);
+    ESP_LOGI(TAG, "Exported key length: %zu", public_key_len);
 
-// Print the first few bytes of the exported key
-ESP_LOGI(TAG, "First 8 bytes of ephemeral public key:");
-for (int i = 0; i < 65; i++) {
-    printf("%02x ", out_ephemeral_public[i]);
-}
-printf("\n");
+    // Print the first few bytes of the exported key
+    ESP_LOGI(TAG, "First 8 bytes of ephemeral public key:");
+    for (int i = 0; i < 65; i++)
+    {
+        printf("%02x ", out_ephemeral_public[i]);
+    }
+    printf("\n");
 
-                                         // Copy the IV
+    // Copy the IV
     memcpy(out_iv, iv, 12);
 
     // Print shared secret in hex
@@ -1181,6 +1182,9 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 const char *key_string = "HELLOP@ISA2024"; // 13 chars
                 const char *iv_string = "PAISA@HELLO2024"; // 13 chars
 
+                uint16_t src_addr;
+                uint16_t dst_addr;
+
                 // Convert strings to key values (4 bytes per value)
                 sts_key.key0 = *((uint32_t *)&key_string[0]); // HELL
                 sts_key.key1 = *((uint32_t *)&key_string[4]); // OP@I
@@ -1195,6 +1199,8 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 // Generate random values for key and IV using ESP32's hardware RNG
                 esp_fill_random(&sts_key, sizeof(sts_key));
                 esp_fill_random(&sts_iv, sizeof(sts_iv));
+                esp_fill_random(&src_addr, sizeof(src_addr));
+                esp_fill_random(&dst_addr, sizeof(dst_addr));
 
                 ESP_LOGI(TAG, "STS KEY: 0x%08lX 0x%08lX 0x%08lX 0x%08lX",
                          sts_key.key0, sts_key.key1, sts_key.key2, sts_key.key3);
@@ -1211,10 +1217,17 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 // send_uart_data(debug_disc->data, total_length);
 
                 // Create and send STS and AES data over UART
-                uint8_t crypto_data[64]; // Increased to hold both STS and AES data
+                //uint8_t crypto_data[64]; // Increased to hold both STS and AES data
+                //memcpy(crypto_data, &sts_key, sizeof(sts_key));
+                //memcpy(crypto_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
+                //memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &aes_key, sizeof(aes_key));
+                //send_uart_data(crypto_data, sizeof(crypto_data));
+
+                uint8_t crypto_data[36]; // 16 (STS key) + 16 (STS IV) + 2 (src_addr) + 2 (dst_addr)
                 memcpy(crypto_data, &sts_key, sizeof(sts_key));
                 memcpy(crypto_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
-                memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &aes_key, sizeof(aes_key));
+                memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &src_addr, sizeof(src_addr));
+                memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv) + sizeof(src_addr), &dst_addr, sizeof(dst_addr));
                 send_uart_data(crypto_data, sizeof(crypto_data));
 
                 /*
