@@ -61,6 +61,7 @@ static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_FAIL_BIT BIT1
 static int s_retry_num = 0;
 static uint8_t saved_n_dev[32] = {0};
+static uint32_t cur_timestamp = 0;
 
 // Configure the maximum advertisement size
 #define MAX_ADV_DATA_LEN 255 // Maximum extended advertisement data length
@@ -423,6 +424,17 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
     ESP_LOGI(TAG, "curTS (4 bytes): %02X %02X %02X %02X (Decimal: %lu)",
              data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
              (unsigned long)curTs);
+
+    // if (curTs <= cur_timestamp)
+    // {
+    //    ESP_LOGI(TAG, "Timestamp not valid. Received: %lu, Current: %lu",
+    //             (unsigned long)curTs,
+    //             (unsigned long)cur_timestamp);
+    //    return;
+    // }
+
+    // Update global timestamp
+    // cur_timestamp = curTs;
     offset += 4;
 
     // Calculate signature length and print with actual size
@@ -1207,6 +1219,29 @@ cleanup:
     return ret;
 }
 
+static bool is_timestamp_valid(const uint8_t *data) {
+    // Adjust offset to find timestamp
+    int offset = 7 + 9 + 32; // Same offset as before
+    
+    uint32_t curTs = data[offset] |
+                     (data[offset + 1] << 8) |
+                     (data[offset + 2] << 16) |
+                     (data[offset + 3] << 24);
+
+    // Compare timestamp
+    if (curTs <= cur_timestamp) {
+        ESP_LOGI(TAG, "Timestamp not valid. Received: %lu, Current: %lu",
+                 (unsigned long)curTs,
+                 (unsigned long)cur_timestamp);
+        return false;
+    }
+
+    // Update global timestamp
+    cur_timestamp = curTs;
+    return true;
+}
+
+
 static int ble_gap_event(struct ble_gap_event *event, void *arg)
 {
     switch (event->type)
@@ -1218,6 +1253,12 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
 
         if (debug_disc->data != NULL && debug_disc->data[4] == 0xFF && contains_loc_paisa(debug_disc->data))
         {
+
+            // CHECK TIMESTAMP FRESHNESS
+            if (!is_timestamp_valid(debug_disc->data)) {
+                return 0; // Exit the event handler
+            }
+
             ESP_LOGI(TAG, "Found LOC-PAISA advertisement");
 
             uint8_t total_length = debug_disc->data[3];
@@ -1231,8 +1272,6 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                      disc->addr.val[2], disc->addr.val[1], disc->addr.val[0]);
             ESP_LOGI(TAG, "Sender address: %s", addr_str);
 
-            // TODO
-            // CHECK TIMESTAMP FRESHNESS
 
             // TODO
             // VERIFY MANIFEST IDEV SIGNATURE USIGN PKMSR
@@ -1337,7 +1376,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 if (ret == 0)
                 {
                     size_t total_length = 0;
-                    memcpy(complete_message, saved_n_dev, 32);  // Start with n_dev
+                    memcpy(complete_message, saved_n_dev, 32); // Start with n_dev
                     total_length += 32;
                     memcpy(complete_message + total_length, ephemeral_public, 65);
                     total_length += 65;
@@ -1345,7 +1384,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                     total_length += 12;
                     memcpy(complete_message + total_length, encrypted_sts_data, encrypted_length);
                     total_length += encrypted_length;
-                
+
                     send_ble_message(complete_message, total_length);
                 }
 
