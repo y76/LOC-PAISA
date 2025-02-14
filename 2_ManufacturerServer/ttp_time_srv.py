@@ -113,7 +113,7 @@ while(True):
 
         message = prepare_syncResp(id_dev, n1_dev)
 
-        #print("message: ", message)
+        print("message: ", message)
         #print("address: ", address)
 
         # Sending a reply to client

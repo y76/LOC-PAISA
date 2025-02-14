@@ -123,7 +123,7 @@ typedef void (*NonSecureResetHandler_t)(void) __attribute__((cmse_nonsecure_call
 //^this is new key
 //#define PRV_DEV_PRIV_KEY_2 "-----BEGIN EC PRIVATE KEY-----\r\nMHcCAQEEIMCN41GeyddpeoLLRxYWxXuhA6zPWFQP+tUrETjQMCNIoAoGCCqGSM49\r\nAwEHoUQDQgAEmYbN0Zu2DcGhrNVf9zVXlir1Bl8plvUn5imN21xGlZccAWLFmOw6\r\nkNLPGlgDR5io4caAnOtpTlRfKwhC5nKGoA==\r\n-----END EC PRIVATE KEY-----"
 //#define PUB_M_SRV_KEY_PEM "-----BEGIN PUBLIC KEY-----\r\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5rsw8U6LAUNkn5Ww7s5X\r\nDQH0NCnpXA+UdQzbtUb8zzXNrMix6fFBD0+SEJNYoUeYTsm0cAdegCZHlTxCtdW2\r\n8sTyY9ssg7PWIqJZHpQ0WmagOWl06Luh7Wxuk4iMDe68eLnpJgi2X7WsZiA5bmXf\r\nrWpV/15v7VwWvjJrt6C9N3l4KcfTxljRJS3vDCkQuse15lWtKccpKV8fg70Ax0PZ\r\n0hYiWcEGJrXKoFKdeWnxz9Kb36K0mtQddYCdP0ec24ZVkNAcxMlFk+az6P1VvWO7\r\n3UyAat3d4yfH7nZV1h/8vRyHI3+Uh/XCfnwFLemsuK9xygtm3uLjYurOtbZZCtH9\r\n5wIDAQAB\r\n-----END PUBLIC KEY-----"
-#define PUB_M_SRV_KEY_PEM 		"-----BEGIN PUBLIC KEY-----\r\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEp5WVs1qXLCPdYresNZkyJ192FxXA\r\nTxFzfZHwtWX+xs50yc4x4ax7sNrzWyAe3F87ZZ8MpK+e60gEJumTrp6mzA==\r\n-----END PUBLIC KEY-----"
+#define PUB_M_SRV_KEY_PEM 		"-----BEGIN PUBLIC KEY-----\r\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUoT5Ct1reTJanqFLf6NAm5Kt6G8x\r\n4ngbrnjzTH1fDkQTr0eTDCJeoBPBxSP3kT3IJ8+7UZ/vBGKfYr/MuP6vYg==\r\n-----END PUBLIC KEY-----"
 #define M_SRV_URL				"https://bit.ly/3EJadxK"//"https://bit.ly/430XMb1"//"https://bit.ly/4hAjeaU"//"https://bit.ly/4glPu0g"//"https://bit.ly/3HnHwEu"
 #define MSG_END_CHAR		"MSGEND"
 #define ACK_END_CHAR		"ACKEND"
@@ -1134,19 +1134,27 @@ int main(void)
 								10);
 	if(ret != 0){while(1);}
 
+	DisableIRQ(WIFI_USART_IRQn);    // Disable USART interrupt
+	DisableIRQ(WIFI_USART2_IRQn);   // Disable USART2 interrupt
+
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[0] = DWT->CYCCNT;
 #endif
-	//syncReq(req_buffer);
+	syncReq(req_buffer);
+	PRINTF("sync req \n\r");
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[1] = DWT->CYCCNT;
 #endif
-//	syncResp(req_buffer, resp_buffer);
+	syncResp(req_buffer, resp_buffer);
+	PRINTF("sync resp \n\r");
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[2] = DWT->CYCCNT;
 #endif
-//	syncAck(resp_buffer);
 
+	syncAck(resp_buffer);
+	PRINTF("sync ack \n\r");
+	EnableIRQ(WIFI_USART_IRQn);     // Re-enable USART interrupt
+	EnableIRQ(WIFI_USART2_IRQn);    // Re-enable USART2 interrupt
    	/* init CTimer */
    	ctimer_init();
 #ifdef PERFORMANCE_EVALUATION
