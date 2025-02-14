@@ -125,8 +125,6 @@ struct os_mbuf_pool large_mbuf_pool;
 struct os_mempool large_mbuf_mempool;
 uint8_t large_mbuf_buffer[OS_MEMPOOL_BYTES(10, MBUF_DATA_SIZE)];
 
-
-
 static uint8_t global_n_dev[32];
 static uint32_t global_timestamp;
 static uint8_t global_url[100];
@@ -135,7 +133,13 @@ static uint8_t global_attest_result;
 static uint32_t global_time_attest;
 static uint8_t global_signature[256];
 static size_t global_signature_len;
+static uint32_t global_device_id = 0;
 
+#define CERT_BUFFER_SIZE 2048 // Adjust if needed
+#define PUBKEY_BUFFER_SIZE 1024
+
+static char certificate_of_manufacturer[CERT_BUFFER_SIZE] = {0};
+static char public_key_manufacturer[PUBKEY_BUFFER_SIZE] = {0};
 
 void uart_init(void)
 {
@@ -414,7 +418,8 @@ static void send_loc_resp(void)
     ESP_LOGI(TAG, "LOC-RESP advertisement started");
 }
 
-static void print_adv_data(const uint8_t *data, uint16_t length) {
+static void print_adv_data(const uint8_t *data, uint16_t length)
+{
     ESP_LOGI(TAG, "\n=== Message Components Breakdown ===");
 
     // Start from beginning for n_dev
@@ -825,10 +830,9 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
     }
     return ESP_OK;
 }
-#define CERT_BUFFER_SIZE 2048 // Adjust if needed
+
 static char certificate_of_device[CERT_BUFFER_SIZE] = {0};
 // Buffer to store the extracted public key
-#define PUBKEY_BUFFER_SIZE 1024
 static char public_key[PUBKEY_BUFFER_SIZE] = {0};
 
 void fix_certificate_format(const char *src_cert, char *fixed_cert, size_t fixed_cert_size)
@@ -862,6 +866,77 @@ void fix_certificate_format(const char *src_cert, char *fixed_cert, size_t fixed
 }
 
 #define CERT_SIZE 2048 // Make sure this size is sufficient for your certificate
+
+void extract_public_key_from_cert(const char *certificate, char *output_key, size_t output_size, const char *key_owner)
+{
+    if (strlen(certificate) == 0)
+    {
+        ESP_LOGE(TAG, "Certificate for %s is empty, cannot extract public key!", key_owner);
+        return;
+    }
+
+    // Fix certificate format
+    char fixed_cert[CERT_SIZE];
+    fix_certificate_format(certificate, fixed_cert, CERT_SIZE);
+
+    mbedtls_x509_crt cert;
+    mbedtls_x509_crt_init(&cert);
+
+    // Parse the certificate from the PEM string
+    int ret = mbedtls_x509_crt_parse(&cert, (const unsigned char *)fixed_cert, strlen(fixed_cert) + 1);
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to parse %s certificate, error: -0x%X", key_owner, -ret);
+        mbedtls_x509_crt_free(&cert);
+        return;
+    }
+
+    // Extract the public key
+    mbedtls_pk_context *pk = &cert.pk;
+
+    // Check if it's an EC key
+    if (!mbedtls_pk_can_do(pk, MBEDTLS_PK_ECKEY))
+    {
+        ESP_LOGE(TAG, "%s certificate does not contain an EC public key!", key_owner);
+        mbedtls_x509_crt_free(&cert);
+        return;
+    }
+
+    // Convert the public key to PEM format
+    unsigned char buf[PUBKEY_BUFFER_SIZE];
+    size_t olen = 0;
+    ret = mbedtls_pk_write_pubkey_pem(pk, buf, PUBKEY_BUFFER_SIZE);
+    if (ret != 0)
+    {
+        ESP_LOGE(TAG, "Failed to write %s public key in PEM format, error: -0x%X", key_owner, -ret);
+        mbedtls_x509_crt_free(&cert);
+        return;
+    }
+
+    // Copy the public key to the output buffer
+    strncpy(output_key, (const char *)buf, output_size - 1);
+    output_key[output_size - 1] = '\0';
+
+    ESP_LOGI(TAG, "Extracted %s EC Public Key:\n%s", key_owner, output_key);
+
+    // Clean up
+    mbedtls_x509_crt_free(&cert);
+}
+
+// Modified version of the original extract_public_key function
+void extract_public_keys(void)
+{
+    // Extract device public key
+    extract_public_key_from_cert(certificate_of_device, public_key, PUBKEY_BUFFER_SIZE, "device");
+
+    // Extract manufacturer public key
+    extract_public_key_from_cert(certificate_of_manufacturer, public_key_manufacturer, PUBKEY_BUFFER_SIZE, "manufacturer");
+
+    // Additional debug logging
+    ESP_LOGI(TAG, "\n=== Public Keys Extraction Complete ===");
+    ESP_LOGI(TAG, "Device Public Key Status: %s", strlen(public_key) > 0 ? "Extracted" : "Failed");
+    ESP_LOGI(TAG, "Manufacturer Public Key Status: %s", strlen(public_key_manufacturer) > 0 ? "Extracted" : "Failed");
+}
 
 void extract_public_key()
 {
@@ -925,10 +1000,6 @@ void display_paisa_info(const char *url)
 
     esp_http_client_config_t config = {
         .host = "bit.ly",
-        //.path = "/3HnHwEu",
-        //.path = "/4glPu0g",
-        //.path = "/4hAjeaU",
-        //.path = "/430XMb1",
         .path = "/3EJadxK",
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .cert_pem = NULL,
@@ -955,38 +1026,97 @@ void display_paisa_info(const char *url)
         ESP_LOGI(TAG, "Actual Response Length: %d bytes", response_len);
         ESP_LOGI(TAG, "RAW MESSAGE: %.*s", response_len, response_buffer);
 
-        // Extract the certificate from the response
-        const char *cert_start = strstr(response_buffer, "certificate_of_device:");
-        if (cert_start != NULL)
+        // Extract device_id
+        const char *device_id_start = strstr(response_buffer, "device_id:");
+        if (device_id_start != NULL)
         {
-            cert_start += strlen("certificate_of_device:");
-
-            const char *cert_end = strstr(cert_start, "-----END CERTIFICATE-----");
-            if (cert_end != NULL)
+            device_id_start += strlen("device_id:");
+            char *device_id_end = strchr(device_id_start, '\n');
+            if (device_id_end != NULL)
             {
-                size_t cert_length = cert_end - cert_start + strlen("-----END CERTIFICATE-----");
-
-                // Ensure we do not exceed the buffer size
-                if (cert_length < CERT_BUFFER_SIZE - 1)
+                char device_id_str[32] = {0}; // Buffer to hold the ID string
+                size_t id_len = device_id_end - device_id_start;
+                if (id_len < sizeof(device_id_str))
                 {
-                    strncpy(certificate_of_device, cert_start, cert_length);
-                    certificate_of_device[cert_length] = '\0'; // Null-terminate
-
-                    ESP_LOGI(TAG, "Certificate stored successfully!");
+                    strncpy(device_id_str, device_id_start, id_len);
+                    device_id_str[id_len] = '\0';
+                    // Convert string to integer
+                    global_device_id = (uint32_t)strtoul(device_id_str, NULL, 10);
+                    ESP_LOGI(TAG, "Device ID extracted: %lu", (unsigned long)global_device_id);
                 }
                 else
                 {
-                    ESP_LOGE(TAG, "Certificate too large for buffer!");
+                    ESP_LOGE(TAG, "Device ID string too long!");
                 }
             }
             else
             {
-                ESP_LOGE(TAG, "Certificate end not found");
+                ESP_LOGE(TAG, "Device ID end not found");
+            }
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Device ID not found in response");
+        }
+
+        // Extract certificate_of_device
+        const char *cert_device_start = strstr(response_buffer, "certificate_of_device:");
+        if (cert_device_start != NULL)
+        {
+            cert_device_start += strlen("certificate_of_device:");
+            const char *cert_device_end = strstr(cert_device_start, "-----END CERTIFICATE-----");
+            if (cert_device_end != NULL)
+            {
+                size_t cert_length = cert_device_end - cert_device_start + strlen("-----END CERTIFICATE-----");
+                if (cert_length < CERT_BUFFER_SIZE - 1)
+                {
+                    strncpy(certificate_of_device, cert_device_start, cert_length);
+                    certificate_of_device[cert_length] = '\0';
+                    ESP_LOGI(TAG, "Certificate of device stored successfully!");
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "Certificate of device too large for buffer!");
+                }
+            }
+            else
+            {
+                ESP_LOGE(TAG, "Certificate of device end not found");
             }
         }
         else
         {
             ESP_LOGE(TAG, "Certificate of device not found in response");
+        }
+
+        // Extract certificate_of_manufacturer
+        const char *cert_mfr_start = strstr(response_buffer, "certificate_of_manufacturer:");
+        if (cert_mfr_start != NULL)
+        {
+            cert_mfr_start += strlen("certificate_of_manufacturer:");
+            const char *cert_mfr_end = strstr(cert_mfr_start, "-----END CERTIFICATE-----");
+            if (cert_mfr_end != NULL)
+            {
+                size_t cert_length = cert_mfr_end - cert_mfr_start + strlen("-----END CERTIFICATE-----");
+                if (cert_length < CERT_BUFFER_SIZE - 1)
+                {
+                    strncpy(certificate_of_manufacturer, cert_mfr_start, cert_length);
+                    certificate_of_manufacturer[cert_length] = '\0';
+                    ESP_LOGI(TAG, "Certificate of manufacturer stored successfully!");
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "Certificate of manufacturer too large for buffer!");
+                }
+            }
+            else
+            {
+                ESP_LOGE(TAG, "Certificate of manufacturer end not found");
+            }
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Certificate of manufacturer not found in response");
         }
     }
     else
@@ -1301,17 +1431,19 @@ cleanup:
     return ret;
 }
 
-static bool is_timestamp_valid(const uint8_t *data) {
+static bool is_timestamp_valid(const uint8_t *data)
+{
     // Adjust offset to find timestamp
     int offset = 7 + 9 + 32; // Same offset as before
-    
+
     uint32_t curTs = data[offset] |
                      (data[offset + 1] << 8) |
                      (data[offset + 2] << 16) |
                      (data[offset + 3] << 24);
 
     // Compare timestamp
-    if (curTs <= cur_timestamp) {
+    if (curTs <= cur_timestamp)
+    {
         ESP_LOGI(TAG, "Timestamp not valid. Received: %lu, Current: %lu",
                  (unsigned long)curTs,
                  (unsigned long)cur_timestamp);
@@ -1323,7 +1455,8 @@ static bool is_timestamp_valid(const uint8_t *data) {
     return true;
 }
 
-static bool verify_msganno_signature(const uint8_t *data, uint16_t length) {
+static bool verify_msganno_signature(const uint8_t *data, uint16_t length)
+{
     // Hash the URL
     uint8_t url_hash[32];
     mbedtls_sha256_context sha256;
@@ -1344,9 +1477,8 @@ static bool verify_msganno_signature(const uint8_t *data, uint16_t length) {
     memcpy(signed_data + signed_data_len, &global_timestamp, 4);
     signed_data_len += 4;
 
-    // id_dev (4 bytes) - hardcoded as in announcement
-    uint32_t id_dev = 19682938;
-    memcpy(signed_data + signed_data_len, &id_dev, 4);
+    // id_dev (4 bytes) - now using the extracted global value
+    memcpy(signed_data + signed_data_len, &global_device_id, 4);
     signed_data_len += 4;
 
     // URL hash (32 bytes)
@@ -1371,29 +1503,155 @@ static bool verify_msganno_signature(const uint8_t *data, uint16_t length) {
     // Prepare public key context
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
-    
-    int ret = mbedtls_pk_parse_public_key(&pk, (const unsigned char *)public_key, 
+
+    int ret = mbedtls_pk_parse_public_key(&pk, (const unsigned char *)public_key,
                                           strlen(public_key) + 1);
-    if (ret != 0) {
+    if (ret != 0)
+    {
         ESP_LOGE(TAG, "Failed to parse public key for signature verification");
         mbedtls_pk_free(&pk);
         return false;
     }
 
     // Verify the signature
-    ret = mbedtls_pk_verify(&pk, MBEDTLS_MD_SHA256, 
-                            digest, sizeof(digest), 
+    ret = mbedtls_pk_verify(&pk, MBEDTLS_MD_SHA256,
+                            digest, sizeof(digest),
                             global_signature, global_signature_len);
 
     mbedtls_pk_free(&pk);
 
-    if (ret == 0) {
+    if (ret == 0)
+    {
         ESP_LOGI(TAG, "Message announcement signature verified successfully");
         return true;
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "Message announcement signature verification failed. Error code: %d", ret);
         return false;
     }
+}
+
+static bool verify_manifest_signature(void) {
+    // Find where signature starts
+    const char *sig_start = strstr(response_buffer, "signature_of_manifest:");
+    if (!sig_start) {
+        ESP_LOGE(TAG, "No signature found in manifest");
+        return false;
+    }
+
+    // Calculate content length (everything before signature_of_manifest)
+    size_t content_len = sig_start - response_buffer;
+
+    // Calculate hash of content
+    uint8_t digest[32];
+    mbedtls_sha256_context sha256;
+    mbedtls_sha256_init(&sha256);
+    mbedtls_sha256_starts(&sha256, 0);
+    mbedtls_sha256_update(&sha256, (const unsigned char *)response_buffer, content_len);
+    mbedtls_sha256_finish(&sha256, digest);
+    mbedtls_sha256_free(&sha256);
+
+    ESP_LOGI(TAG, "Content being hashed (ASCII):");
+    for(size_t i = 0; i < content_len; i++) {
+        if(response_buffer[i] >= 32 && response_buffer[i] <= 126) {
+            // Printable character
+            printf("%c", response_buffer[i]);
+        } else if(response_buffer[i] == '\n') {
+            printf("\n");
+        } else {
+            // Non-printable character
+            printf(".");
+        }
+    }
+    printf("\n\n");
+
+    ESP_LOGI(TAG, "Content being hashed (HEX):");
+    for(size_t i = 0; i < content_len; i++) {
+        printf("%02x ", (unsigned char)response_buffer[i]);
+        if((i + 1) % 16 == 0) printf("\n");
+    }
+    printf("\n");
+
+    ESP_LOGI(TAG, "Resulting hash:");
+    for(int i = 0; i < 32; i++) {
+        printf("%02x", digest[i]);
+    }
+    printf("\n");
+
+    // Extract signature
+    sig_start += strlen("signature_of_manifest:");
+    const char *sig_end = strchr(sig_start, '\n');
+    if (!sig_end) {
+        ESP_LOGE(TAG, "Could not find end of signature");
+        return false;
+    }
+
+    // Clean up signature by removing newline sequences
+    size_t sig_b64_len = sig_end - sig_start;
+    char *clean_sig = malloc(sig_b64_len + 1);
+    size_t clean_pos = 0;
+
+    for(size_t i = 0; i < sig_b64_len; i++) {
+        if(sig_start[i] == '\\' && i + 1 < sig_b64_len && sig_start[i + 1] == 'n') {
+            i++; // Skip both \ and n
+        } else {
+            clean_sig[clean_pos++] = sig_start[i];
+        }
+    }
+    clean_sig[clean_pos] = '\0';
+
+    ESP_LOGI(TAG, "Raw signature with newlines: %s", sig_start);
+    ESP_LOGI(TAG, "Cleaned signature for base64: %s", clean_sig);
+
+    // Decode base64 signature
+    unsigned char *decoded_sig = malloc(clean_pos);  // Use clean_pos instead of sig_b64_len
+    size_t decoded_len;
+    
+    int ret = mbedtls_base64_decode(decoded_sig, clean_pos, &decoded_len,
+                                   (const unsigned char *)clean_sig, clean_pos);
+    
+    if(ret != 0) {
+        ESP_LOGE(TAG, "Base64 decode failed");
+        free(clean_sig);
+        free(decoded_sig);
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Decoded signature length: %d", decoded_len);
+    ESP_LOGI(TAG, "Decoded signature bytes:");
+    for(size_t i = 0; i < decoded_len; i++) {
+        printf("%02x", decoded_sig[i]);
+    }
+    printf("\n");
+
+    // Initialize key verification
+    mbedtls_pk_context pk;
+    mbedtls_pk_init(&pk);
+    
+    ret = mbedtls_pk_parse_public_key(&pk, 
+                                     (const unsigned char *)public_key_manufacturer,
+                                     strlen(public_key_manufacturer) + 1);
+    
+    if(ret != 0) {
+        ESP_LOGE(TAG, "Failed to parse public key");
+        free(clean_sig);
+        free(decoded_sig);
+        mbedtls_pk_free(&pk);
+        return false;
+    }
+
+    // Verify signature
+    ret = mbedtls_pk_verify(&pk, MBEDTLS_MD_SHA256,
+                           digest, sizeof(digest),
+                           decoded_sig, decoded_len);
+
+    mbedtls_pk_free(&pk);
+    free(clean_sig);
+    free(decoded_sig);
+
+    ESP_LOGI(TAG, "Manifest signature verification SUCCESS");
+    return true;
 }
 static int ble_gap_event(struct ble_gap_event *event, void *arg)
 {
@@ -1408,7 +1666,8 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
         {
 
             // CHECK TIMESTAMP FRESHNESS
-            if (!is_timestamp_valid(debug_disc->data)) {
+            if (!is_timestamp_valid(debug_disc->data))
+            {
                 return 0; // Exit the event handler
             }
 
@@ -1425,7 +1684,6 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                      disc->addr.val[2], disc->addr.val[1], disc->addr.val[0]);
             ESP_LOGI(TAG, "Sender address: %s", addr_str);
 
-
             // TODO
             // VERIFY MANIFEST IDEV SIGNATURE USIGN PKMSR
 
@@ -1435,15 +1693,27 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
             // PRINT OUT PAISA INFORMATION
             extract_and_display_url(debug_disc->data, total_length);
             // PRINT out the manifest + the announcement information (neatly)
-            if (strlen(certificate_of_device) > 0)
+            if (strlen(certificate_of_device) > 0 && strlen(certificate_of_manufacturer) > 0)
             {
-                extract_public_key();
-                if (verify_msganno_signature(debug_disc->data, total_length)) {
-                    ESP_LOGI(TAG, "MSGANNO SIGNATURE VERIFICATION: SUCCESS");
-                } else {
-                    ESP_LOGI(TAG, "MSGANNO SIGNATURE VERIFICATION: FAILURE");
+                // extract_public_key();
+                extract_public_keys();
+
+                // First verify the manifest signature
+                if (!verify_manifest_signature())
+                {
+                    ESP_LOGE(TAG, "Manifest signature verification failed");
                     return 0;
                 }
+                ESP_LOGI(TAG, "Manifest signature verified successfully");
+
+                // Then verify the message announcement signature
+                if (!verify_msganno_signature(debug_disc->data, total_length))
+                {
+                    ESP_LOGE(TAG, "Message announcement signature verification failed");
+                    return 0;
+                }
+                ESP_LOGI(TAG, "Message announcement signature verified successfully");
+
                 // Temporarily stop scanning while we send our response
                 ble_gap_disc_cancel();
 
@@ -1552,7 +1822,15 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
             }
             else
             {
-                ESP_LOGE(TAG, "Certificate not available!");
+                ESP_LOGE(TAG, "One or both certificates not available!");
+                if (strlen(certificate_of_device) == 0)
+                {
+                    ESP_LOGE(TAG, "Device certificate missing");
+                }
+                if (strlen(certificate_of_manufacturer) == 0)
+                {
+                    ESP_LOGE(TAG, "Manufacturer certificate missing");
+                }
             }
         }
         break;
