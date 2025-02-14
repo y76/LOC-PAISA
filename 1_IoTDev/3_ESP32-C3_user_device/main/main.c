@@ -125,6 +125,18 @@ struct os_mbuf_pool large_mbuf_pool;
 struct os_mempool large_mbuf_mempool;
 uint8_t large_mbuf_buffer[OS_MEMPOOL_BYTES(10, MBUF_DATA_SIZE)];
 
+
+
+static uint8_t global_n_dev[32];
+static uint32_t global_timestamp;
+static uint8_t global_url[100];
+static uint8_t global_url_len;
+static uint8_t global_attest_result;
+static uint32_t global_time_attest;
+static uint8_t global_signature[256];
+static size_t global_signature_len;
+
+
 void uart_init(void)
 {
     /* Configure parameters of an UART driver,
@@ -401,6 +413,76 @@ static void send_loc_resp(void)
     free(adv_data);
     ESP_LOGI(TAG, "LOC-RESP advertisement started");
 }
+
+static void print_adv_data(const uint8_t *data, uint16_t length) {
+    ESP_LOGI(TAG, "\n=== Message Components Breakdown ===");
+
+    // Start from beginning for n_dev
+    int offset = 7 + 9; // Skip BLE header and LOC-PAISA
+
+    // n_dev (32 bytes)
+    ESP_LOGI(TAG, "n_dev (32 bytes): ");
+    for (int i = 0; i < 32; i++)
+    {
+        printf("%02X ", data[offset + i]);
+        global_n_dev[i] = data[offset + i];
+    }
+    printf("\n");
+    offset += 32;
+
+    // curTS (4 bytes)
+    uint32_t curTs = data[offset] | (data[offset + 1] << 8) |
+                     (data[offset + 2] << 16) | (data[offset + 3] << 24);
+    global_timestamp = curTs;
+    ESP_LOGI(TAG, "curTS (4 bytes): %02X %02X %02X %02X (Decimal: %lu)",
+             data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+             (unsigned long)curTs);
+    offset += 4;
+
+    // Calculate signature length and print with actual size
+    int sig_start = offset;
+    int sig_end = length - 6 - data[length - 6];
+    int sig_len = sig_end - sig_start;
+    ESP_LOGI(TAG, "signature (%d bytes): ", sig_len);
+    for (int i = sig_start; i < sig_end; i++)
+    {
+        printf("%02X ", data[i]);
+        global_signature[i - sig_start] = data[i];
+    }
+    global_signature_len = sig_len;
+    printf("\n");
+
+    // Print URL
+    uint8_t url_len = data[length - 6];
+    global_url_len = url_len;
+    ESP_LOGI(TAG, "M_SRV_URL (%d bytes): ", url_len);
+    for (int i = 0; i < url_len; i++)
+    {
+        printf("%c", data[length - 6 - url_len + i]);
+        global_url[i] = data[length - 6 - url_len + i];
+    }
+    global_url[url_len] = '\0';
+    printf("\n");
+
+    // url_len
+    ESP_LOGI(TAG, "m_srv_url_len (1 byte): %02X (Decimal: %u)", url_len, url_len);
+
+    // attest_result
+    global_attest_result = data[length - 5];
+    ESP_LOGI(TAG, "attest_result (1 byte): %02X", global_attest_result);
+
+    // time_attest
+    uint32_t time_attest = data[length - 4] | (data[length - 3] << 8) |
+                           (data[length - 2] << 16) | (data[length - 1] << 24);
+    global_time_attest = time_attest;
+    ESP_LOGI(TAG, "time_attest (4 bytes): %02X %02X %02X %02X (Decimal: %lu)",
+             data[length - 4], data[length - 3], data[length - 2], data[length - 1],
+             (unsigned long)time_attest);
+
+    // Rest of the existing print_adv_data function...
+}
+
+/*
 static void print_adv_data(const uint8_t *data, uint16_t length)
 {
     ESP_LOGI(TAG, "\n=== Message Components Breakdown ===");
@@ -489,7 +571,7 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
             printf("\n");
     }
     printf("\n");
-}
+}*/
 /*
 // Function to print advertisement data in a readable format
 static void print_adv_data(const uint8_t *data, uint16_t length)
@@ -1241,7 +1323,78 @@ static bool is_timestamp_valid(const uint8_t *data) {
     return true;
 }
 
+static bool verify_msganno_signature(const uint8_t *data, uint16_t length) {
+    // Hash the URL
+    uint8_t url_hash[32];
+    mbedtls_sha256_context sha256;
+    mbedtls_sha256_init(&sha256);
+    mbedtls_sha256_starts(&sha256, 0);
+    mbedtls_sha256_update(&sha256, global_url, global_url_len);
+    mbedtls_sha256_finish(&sha256, url_hash);
 
+    // Reconstruct signed message components
+    uint8_t signed_data[256];
+    size_t signed_data_len = 0;
+
+    // n_dev (32 bytes)
+    memcpy(signed_data, global_n_dev, 32);
+    signed_data_len += 32;
+
+    // timestamp (4 bytes)
+    memcpy(signed_data + signed_data_len, &global_timestamp, 4);
+    signed_data_len += 4;
+
+    // id_dev (4 bytes) - hardcoded as in announcement
+    uint32_t id_dev = 19682938;
+    memcpy(signed_data + signed_data_len, &id_dev, 4);
+    signed_data_len += 4;
+
+    // URL hash (32 bytes)
+    memcpy(signed_data + signed_data_len, url_hash, 32);
+    signed_data_len += 32;
+
+    // attest_result (1 byte)
+    memcpy(signed_data + signed_data_len, &global_attest_result, 1);
+    signed_data_len += 1;
+
+    // time_attest (4 bytes)
+    memcpy(signed_data + signed_data_len, &global_time_attest, 4);
+    signed_data_len += 4;
+
+    // Hash the reconstructed signed data
+    uint8_t digest[32];
+    mbedtls_sha256_init(&sha256);
+    mbedtls_sha256_starts(&sha256, 0);
+    mbedtls_sha256_update(&sha256, signed_data, signed_data_len);
+    mbedtls_sha256_finish(&sha256, digest);
+
+    // Prepare public key context
+    mbedtls_pk_context pk;
+    mbedtls_pk_init(&pk);
+    
+    int ret = mbedtls_pk_parse_public_key(&pk, (const unsigned char *)public_key, 
+                                          strlen(public_key) + 1);
+    if (ret != 0) {
+        ESP_LOGE(TAG, "Failed to parse public key for signature verification");
+        mbedtls_pk_free(&pk);
+        return false;
+    }
+
+    // Verify the signature
+    ret = mbedtls_pk_verify(&pk, MBEDTLS_MD_SHA256, 
+                            digest, sizeof(digest), 
+                            global_signature, global_signature_len);
+
+    mbedtls_pk_free(&pk);
+
+    if (ret == 0) {
+        ESP_LOGI(TAG, "Message announcement signature verified successfully");
+        return true;
+    } else {
+        ESP_LOGE(TAG, "Message announcement signature verification failed. Error code: %d", ret);
+        return false;
+    }
+}
 static int ble_gap_event(struct ble_gap_event *event, void *arg)
 {
     switch (event->type)
@@ -1285,6 +1438,12 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
             if (strlen(certificate_of_device) > 0)
             {
                 extract_public_key();
+                if (verify_msganno_signature(debug_disc->data, total_length)) {
+                    ESP_LOGI(TAG, "MSGANNO SIGNATURE VERIFICATION: SUCCESS");
+                } else {
+                    ESP_LOGI(TAG, "MSGANNO SIGNATURE VERIFICATION: FAILURE");
+                    return 0;
+                }
                 // Temporarily stop scanning while we send our response
                 ble_gap_disc_cancel();
 
