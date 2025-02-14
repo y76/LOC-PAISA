@@ -9,8 +9,8 @@ from time import time
 IP     = ''
 PORT   = 10000
 BUFFER_SIZE  = 1024
-DEV_PUB_FILE = 'keys/dev_0_pub.pem'
-M_SRV_PRV_FILE = 'keys/ttp_sec.pem'
+DEV_PUB_FILE = '../keys/secp256r1/dev/pub.pem'
+M_SRV_PRV_FILE = '../keys/secp256r1/ttp/key.pem'
 NONCE_SIZE = 32
 TIME_SIZE = 4
 ID_SIZE = 4
