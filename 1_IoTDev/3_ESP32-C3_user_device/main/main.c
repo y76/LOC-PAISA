@@ -297,6 +297,15 @@ static void send_ble_message(uint8_t *data, size_t data_len)
     memcpy(&adv_data[7], prefix, prefix_len);
     memcpy(&adv_data[7 + prefix_len], data, data_len);
 
+    printf("  Complete packet (hex):\n    ");
+    for (size_t i = 0; i < total_adv_length; i++) {
+        printf("%02X ", adv_data[i]);
+        if ((i + 1) % 16 == 0 && i < total_adv_length - 1) {
+            printf("\n    ");
+        }
+    }
+    printf("\n");
+
     // Rest of function same as before
     struct os_mbuf *mbuf;
     int rc;
@@ -1805,7 +1814,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 if (ret == 0)
                 {
                     size_t total_length = 0;
-                    memcpy(complete_message, saved_n_dev, 32); // Start with n_dev
+                    memcpy(complete_message, global_n_dev, 32); // Start with n_dev
                     total_length += 32;
                     memcpy(complete_message + total_length, ephemeral_public, 65);
                     total_length += 65;

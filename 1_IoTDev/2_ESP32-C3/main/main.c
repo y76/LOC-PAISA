@@ -74,7 +74,7 @@ void ble_store_config_init(void);
 #define BRD_END_CHAR "BRDEND"
 #define NSC_END_CHAR "NSCEND"
 
-#define BUF_SIZE (155)
+#define BUF_SIZE (254)
 
 #define MBUF_DATA_SIZE 260 // Maximum advertising data length is 255 bytes
 
@@ -171,8 +171,8 @@ void wifi_init(void)
 // Add STA mode start function
 void wifi_start_sta(void)
 {
-#define SSID "sprout-new"
-#define PASSWORD "youknowwho6"
+#define SSID "THE BEST TP LINK"
+#define PASSWORD "ZOTzot2023"
 
     xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
 
@@ -213,7 +213,7 @@ void wifi_start_sta(void)
 
 void udp_connection_w_mfr(uint8_t *data, int len)
 {
-    const char *mfr_ip = "192.168.1.63";
+    const char *mfr_ip = "192.168.0.138";
     const int mfr_port = 10000;
 
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -719,7 +719,20 @@ static void send_uart_data(const uint8_t *data, uint8_t data_len)
     size_t start_marker_len = strlen(start_marker);
     size_t end_marker_len = strlen(end_marker);
 
-    char *buf = (char *)malloc(BUF_SIZE);
+    // Calculate required buffer size with safety margin
+    size_t required_size = start_marker_len + data_len + end_marker_len + 1; // +1 for NULL terminator
+    
+    // Check for potential overflow
+    if (required_size > BUF_SIZE) {
+        ESP_LOGE(tag, "Data too large for buffer: %d bytes needed, %d available", 
+                 required_size, BUF_SIZE);
+        // Either truncate data or return
+        data_len = BUF_SIZE - start_marker_len - end_marker_len - 1;
+        ESP_LOGW(tag, "Truncating data to %d bytes", data_len);
+    }
+
+    // Use a static buffer instead of malloc to avoid fragmentation
+    static char buf[BUF_SIZE];
     memset(buf, 0, BUF_SIZE);
 
     // Build complete message: START_MARKER + DATA + END_MARKER
@@ -730,8 +743,7 @@ static void send_uart_data(const uint8_t *data, uint8_t data_len)
     pos += start_marker_len;
 
     // Copy data if present
-    if (data && data_len > 0)
-    {
+    if (data && data_len > 0) {
         memcpy(buf + pos, data, data_len);
         pos += data_len;
     }
@@ -739,24 +751,22 @@ static void send_uart_data(const uint8_t *data, uint8_t data_len)
     // Copy end marker
     memcpy(buf + pos, end_marker, end_marker_len);
     pos += end_marker_len;
+    
+    // Ensure null termination
+    buf[pos] = '\0';
 
     // Print complete message before sending
-    printf("Sending message (hex): ");
-    for (size_t i = 0; i < pos; i++)
-    {
+    ESP_LOGI(tag, "Sending message (hex): ");
+    for (size_t i = 0; i < pos; i++) {
         printf("%02X", (unsigned char)buf[i]);
     }
-    printf("\nSending message (ASCII): ");
-    for (size_t i = 0; i < pos; i++)
-    {
-        printf("%c", buf[i]);
-    }
     printf("\n");
-
+    
+    ESP_LOGI(tag, "Sending message (ASCII): %s", buf);
     ESP_LOGI(tag, "Sending complete message:");
-    uart_write_bytes(ECHO_UART_PORT_NUM, buf, pos);
 
-    free(buf);
+    uart_write_bytes(ECHO_UART_PORT_NUM, buf, pos);
+   // free(buf);
 }
 
 static int bleprph_gap_event(struct ble_gap_event *event, void *arg)

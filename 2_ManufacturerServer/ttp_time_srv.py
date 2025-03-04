@@ -6,7 +6,7 @@ from datetime import datetime
 from random import random
 from time import time
 
-IP     = ''
+IP     = '192.168.0.138'
 PORT   = 10000
 BUFFER_SIZE  = 1024
 DEV_PUB_FILE = '../keys/secp256r1/dev/pub.pem'
