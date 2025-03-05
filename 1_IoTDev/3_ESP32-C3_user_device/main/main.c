@@ -1243,6 +1243,8 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
     uint8_t iv[12] = {0};
     uint8_t tag[16];
 
+    esp_fill_random(&iv, sizeof(iv));
+
     // Init all contexts
     mbedtls_ecdh_init(&ctx);
     mbedtls_entropy_init(&entropy);
