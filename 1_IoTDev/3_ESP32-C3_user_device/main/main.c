@@ -140,7 +140,9 @@ static uint32_t global_device_id = 0;
 
 static char certificate_of_manufacturer[CERT_BUFFER_SIZE] = {0};
 static char public_key_manufacturer[PUBKEY_BUFFER_SIZE] = {0};
+static void IRAM_ATTR uart_rx_isr_handler(void *arg);
 
+// UART initialization function
 void uart_init(void)
 {
     /* Configure parameters of an UART driver,
@@ -159,10 +161,73 @@ void uart_init(void)
     intr_alloc_flags = ESP_INTR_FLAG_IRAM;
 #endif
 
-    ESP_ERROR_CHECK(uart_driver_install(ECHO_UART_PORT_NUM, UART_BUF_SIZE * 2, 0, 0, NULL, intr_alloc_flags));
+    ESP_ERROR_CHECK(uart_driver_install(ECHO_UART_PORT_NUM, BUF_SIZE * 2, 0, 0, NULL, intr_alloc_flags));
     ESP_ERROR_CHECK(uart_param_config(ECHO_UART_PORT_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(ECHO_UART_PORT_NUM, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS));
-    ESP_LOGD(TAG, "UART init done");
+    ESP_LOGI(TAG, "UART init done");
+}
+
+static void uart_task(void *pvParameters)
+{
+    ESP_LOGI(TAG, "UART task started");
+    uint8_t *data = (uint8_t *)malloc(BUF_SIZE + 1);
+    
+    if (data == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for UART buffer");
+        vTaskDelete(NULL);
+    }
+
+    while (1) {
+        // Wait for data to be received
+        const int rxBytes = uart_read_bytes(ECHO_UART_PORT_NUM, data, BUF_SIZE, 20 / portTICK_PERIOD_MS);
+        
+        if (rxBytes > 0) {
+            // Null-terminate the data (for string operations if needed)
+            data[rxBytes] = 0;
+            
+            // Log received data
+            ESP_LOGI(TAG, "Received %d bytes from UART:", rxBytes);
+            
+            // Print as hex
+            printf("HEX: ");
+            for (int i = 0; i < rxBytes; i++) {
+                printf("%02X ", data[i]);
+                if ((i + 1) % 16 == 0) {
+                    printf("\n     ");
+                }
+            }
+            printf("\n");
+            
+            // Print as ASCII (where printable)
+            printf("ASCII: ");
+            for (int i = 0; i < rxBytes; i++) {
+                if (data[i] >= 32 && data[i] <= 126) {
+                    printf("%c", data[i]);
+                } else {
+                    printf(".");
+                }
+            }
+            printf("\n");
+            
+            // Process received data based on content or protocol
+            // Check for specific end markers or commands
+            
+            // Example: Check for a specific end marker
+            if (rxBytes > 6 && memcmp(&data[rxBytes - 6], "MSGEND", 6) == 0) {
+                ESP_LOGI(TAG, "Received message with MSGEND marker");
+                // Process message
+                
+                // Example response
+                uint8_t response[] = "ACK: Message received";
+            //    send_uart_data(response, sizeof(response) - 1); // -1 to exclude null terminator
+            } 
+            // Add other protocol-specific handlers here
+        }
+    }
+    
+    // This code is never reached but good practice
+    free(data);
+    vTaskDelete(NULL);
 }
 
 static void send_uart_data(const uint8_t *data, uint8_t data_len)
@@ -1922,6 +1987,8 @@ void app_main(void)
 
     // Start the NimBLE host task
     nimble_port_freertos_init(ble_host_task);
+    xTaskCreate(uart_task, "uart_task", 4096, NULL, 10, NULL);
+
 
     ESP_LOGI(TAG, "BLE initialization completed");
 }

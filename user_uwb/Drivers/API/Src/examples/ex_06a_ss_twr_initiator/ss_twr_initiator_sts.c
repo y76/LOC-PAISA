@@ -523,6 +523,9 @@ dwt_setpdoamode(DWT_PDOA_M3);
                             "DIST: %3.2f m, PDOA: %d (%3.1f deg)", 
                             distance, pdoa_val, pdoa_degrees);
                     test_run_info((unsigned char *)dist_pdoa_str);
+                     /* Transmit "b" over UART */
+                    uint8_t tx_byte = 'b';
+                    nrf_drv_uart_tx(&uart_instance, &tx_byte, 1);
 
                 }
                 else
