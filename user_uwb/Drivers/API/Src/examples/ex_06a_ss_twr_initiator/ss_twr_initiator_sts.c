@@ -48,7 +48,7 @@ extern void test_run_info(unsigned char *data);
 #define PI 3.14159265358979f
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 1000
+#define RNG_DELAY_MS 50
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 2 below. */
 #define TX_ANT_DLY 16385
@@ -263,6 +263,8 @@ void uart_event_handler(nrf_drv_uart_event_t *p_event, void *p_context)
                         // Update STS key and IV if we have enough data
                         if (dataLength >= 32) {
                             update_sts_key_iv(&rxBuffer[dataStart], dataLength);
+                            uint8_t tx_byte = 'a';
+                    nrf_drv_uart_tx(&uart_instance, &tx_byte, 1);
                         }
                         break;
                     }
@@ -525,7 +527,9 @@ dwt_setpdoamode(DWT_PDOA_M3);
                     test_run_info((unsigned char *)dist_pdoa_str);
                      /* Transmit "b" over UART */
                     uint8_t tx_byte = 'b';
-                    nrf_drv_uart_tx(&uart_instance, &tx_byte, 1);
+                    nrf_drv_uart_tx(&uart_instance, &tx_byte, 1); nrf_delay_ms(100);
+
+                    NVIC_SystemReset();
 
                 }
                 else

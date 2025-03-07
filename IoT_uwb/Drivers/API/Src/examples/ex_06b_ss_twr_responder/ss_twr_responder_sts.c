@@ -45,7 +45,7 @@ extern void test_run_info(unsigned char *data);
 #define APP_NAME "SS TWR RESP STS v1.0"
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 1000
+#define RNG_DELAY_MS 50
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 2 below. */
 #define TX_ANT_DLY 16385

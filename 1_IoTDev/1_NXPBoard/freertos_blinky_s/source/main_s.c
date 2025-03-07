@@ -108,6 +108,8 @@ typedef void (*NonSecureResetHandler_t)(void) __attribute__((cmse_nonsecure_call
 #define PACKET_SEND_TIMER	5
 #define ATTESTATION_TIMER	5
 
+#define PERFORMANCE_EVALUATION
+
 #define BUF_SIZE			(256)
 #define SIG_SIZE			(256)
 #define NONCE_SIZE			(32)
@@ -283,9 +285,9 @@ void findMessage(const uint8_t* buffer, uint16_t length) {
                     // Safe message extraction
                     for (uint16_t k = msgStart; k < j; k++) {
                         // Optional: add printability check
-                        if (isprint(buffer[k])) {
-                            PRINTF("%c", buffer[k]);
-                        }
+                       // if (isprint(buffer[k])) {
+                       //     PRINTF("%c", buffer[k]);
+                       // }
                     }
                     return;
                 }
@@ -293,122 +295,70 @@ void findMessage(const uint8_t* buffer, uint16_t length) {
         }
     }
 }
-/*
-void WIFI_USART_IRQHandler(void)
-{
-    // Prevent infinite processing
-    uint16_t safety_counter = 0;
-    const uint16_t MAX_ITERATIONS = 100;  // Prevent infinite loop
+static mbedtls_ecdh_context g_ecdh_ctx;
+static mbedtls_entropy_context g_entropy;
+static mbedtls_ctr_drbg_context g_ctr_drbg;
+static mbedtls_pk_context g_our_pk;
+static int g_crypto_initialized = 0;
+static uint32_t reception_start_cycles = 0;
+static uint32_t shared_secret_start_cycles = 0;
+static uint32_t decryption_start_cycles = 0;
 
-    while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART) &&
-           safety_counter++ < MAX_ITERATIONS)
-    {
-        // Read the byte
-        uint8_t receivedByte = USART_ReadByte(WIFI_USART);
-
-        // Store the byte in the buffer
-        if (bufferIndex < MAX_BUFFER_SIZE)
-        {
-            rxBuffer[bufferIndex++] = receivedByte;
-
-            // Check if we have an end marker
-            if (bufferIndex >= END_MARKER_LENGTH &&
-                memcmp(&rxBuffer[bufferIndex - END_MARKER_LENGTH],
-                       END_MARKER, END_MARKER_LENGTH) == 0)
-            {
-                // We have a complete message, process it
-                findMessage(rxBuffer, bufferIndex);
-
-                // Forward complete message to UART2
-                USART_WriteBlocking(WIFI_USART2, rxBuffer, bufferIndex);
-
-                // Reset buffer after processing
-                bufferIndex = 0;
-            }
-        }
-        else
-        {
-            // Buffer is full, reset it
-            bufferIndex = 0;
-        }
-    }
-
-    // If safety counter was hit, force buffer reset
-    if (safety_counter >= MAX_ITERATIONS) {
-        bufferIndex = 0;
-        PRINTF("USART Interrupt: Maximum iterations reached. Potential communication issue.\r\n");
-    }
-
-    // Clear any receive errors
-    USART_ClearStatusFlags(WIFI_USART, kUSART_RxError);
-    SDK_ISR_EXIT_BARRIER;
-}*/
-
+// Modify the decrypt_with_private_key function to add timing measurements (around line 469)
 static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encrypted_len,
-                                  const char *private_key_pem,
                                   const uint8_t *peer_public_key, size_t peer_public_key_len,
                                   const uint8_t *iv,
-                                  uint8_t *decrypted_data, size_t *decrypted_len) {
-    mbedtls_ecdh_context ctx;
-    mbedtls_entropy_context entropy;
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_pk_context our_pk;
-    const char *pers = "decrypt_key";
+                                  uint8_t *decrypted_data, size_t *decrypted_len)
+{
     int ret = 0;
     uint8_t shared_secret[32];
     uint8_t tag[16];
+    uint32_t shared_secret_end_cycles = 0;
+    uint32_t decryption_end_cycles = 0;
 
-    // Initialize contexts
-    mbedtls_ecdh_init(&ctx);
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    mbedtls_pk_init(&our_pk);
-
-    // Seed RNG
-    ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
-                                (const unsigned char *)pers, strlen(pers));
-    if (ret != 0) {
-        PRINTF("Failed to seed RNG: -0x%x\n", -ret);
-        goto cleanup;
-    }
-
-    // Load our private key
-    ret = mbedtls_pk_parse_key(&our_pk, (const unsigned char *)private_key_pem,
-                              strlen(private_key_pem) + 1, NULL, 0);
-    if (ret != 0) {
-        PRINTF("Failed to parse private key: -0x%x\n", -ret);
-        goto cleanup;
+    // Check if crypto is initialized
+    if (!g_crypto_initialized) {
+        PRINTF("Error: Crypto not initialized\n");
+        return -1;
     }
 
     // Setup ECDH with the same curve
-    ret = mbedtls_ecdh_setup(&ctx, MBEDTLS_ECP_DP_SECP256R1);
+    ret = mbedtls_ecdh_setup(&g_ecdh_ctx, MBEDTLS_ECP_DP_SECP256R1);
     if (ret != 0) {
         PRINTF("Failed to setup ECDH: -0x%x\n", -ret);
-        goto cleanup;
+        return ret;
     }
 
-    // Load our private key parameters
-    const mbedtls_ecp_keypair *our_keypair = mbedtls_pk_ec(our_pk);
-    ret = mbedtls_ecdh_get_params(&ctx, our_keypair, MBEDTLS_ECDH_OURS);
+    // Load our private key parameters from the already parsed key
+    const mbedtls_ecp_keypair *our_keypair = mbedtls_pk_ec(g_our_pk);
+    ret = mbedtls_ecdh_get_params(&g_ecdh_ctx, our_keypair, MBEDTLS_ECDH_OURS);
     if (ret != 0) {
         PRINTF("Failed to load our params: -0x%x\n", -ret);
-        goto cleanup;
+        return ret;
     }
 
     // Load peer's ephemeral public key directly from binary
-    ret = mbedtls_ecp_point_read_binary(&ctx.grp, &ctx.Qp,
-                                       peer_public_key, peer_public_key_len);
+    ret = mbedtls_ecp_point_read_binary(&g_ecdh_ctx.grp, &g_ecdh_ctx.Qp,
+                                     peer_public_key, peer_public_key_len);
     if (ret != 0) {
         PRINTF("Failed to load peer public key point: -0x%x\n", -ret);
-        goto cleanup;
+        return ret;
     }
 
+    // Record the start of shared secret derivation
+    shared_secret_start_cycles = DWT->CYCCNT;
+
     // Calculate shared secret
-    ret = mbedtls_ecdh_calc_secret(&ctx, &ret, shared_secret, sizeof(shared_secret),
-                                  mbedtls_ctr_drbg_random, &ctr_drbg);
+    ret = mbedtls_ecdh_calc_secret(&g_ecdh_ctx, &ret, shared_secret, sizeof(shared_secret),
+                                mbedtls_ctr_drbg_random, &g_ctr_drbg);
+
+    // Record end of shared secret derivation and start of decryption
+    shared_secret_end_cycles = DWT->CYCCNT;
+    decryption_start_cycles = DWT->CYCCNT;
+
     if (ret != 0) {
         PRINTF("Failed to compute shared secret: -0x%x\n", -ret);
-        goto cleanup;
+        return ret;
     }
 
     // Setup AES-GCM
@@ -418,7 +368,8 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
     ret = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, shared_secret, 256);
     if (ret != 0) {
         PRINTF("Failed to set GCM key: -0x%x\n", -ret);
-        goto cleanup_gcm;
+        mbedtls_gcm_free(&gcm);
+        return ret;
     }
 
     // The last 16 bytes are the tag
@@ -427,15 +378,19 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
 
     // Decrypt and verify
     ret = mbedtls_gcm_auth_decrypt(&gcm, *decrypted_len,
-                                  iv, 12,
-                                  NULL, 0,
-                                  tag, 16,
-                                  encrypted_data, // Just the encrypted portion
-                                  decrypted_data + START_MARKER_LENGTH);  // Leave space for start marker
+                                iv, 12,
+                                NULL, 0,
+                                tag, 16,
+                                encrypted_data, // Just the encrypted portion
+                                decrypted_data + START_MARKER_LENGTH);  // Leave space for start marker
+
+    // Record end of decryption
+    decryption_end_cycles = DWT->CYCCNT;
 
     if (ret != 0) {
         PRINTF("Decryption failed: -0x%x\n", -ret);
-        goto cleanup_gcm;
+        mbedtls_gcm_free(&gcm);
+        return ret;
     }
 
     // Add markers
@@ -445,41 +400,60 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
     // Update total length to include markers
     *decrypted_len = *decrypted_len + START_MARKER_LENGTH + END_MARKER_LENGTH;
 
-    PRINTF("Decryption successful\n");
+    // Print timing information
+   // PRINTF("\n=== Timing Measurements ===\n");
+    PRINTF("Shared secret derivation time: %u cycles\r\n",
+           shared_secret_end_cycles - shared_secret_start_cycles);
 
-    // Print final data with markers
-    PRINTF("Final data with markers (hex):\n");
-    for (int i = 0; i < *decrypted_len; i++) {
-        PRINTF("%02x", decrypted_data[i]);
-    }
-    PRINTF("\n");
+    PRINTF("Decryption time: %u cycles\r\n",
+           decryption_end_cycles - decryption_start_cycles);
 
-    PRINTF("Final data with markers (ASCII):\n");
-    for (int i = 0; i < *decrypted_len; i++) {
-        PRINTF("%c", decrypted_data[i]);
-    }
-    PRINTF("\n");
-
-    // Debug output for shared secret
-    PRINTF("Shared secret:\n");
-    for (int i = 0; i < 32; i++) {
-        PRINTF("%02x", shared_secret[i]);
-    }
-    PRINTF("\n");
-cleanup_gcm:
     mbedtls_gcm_free(&gcm);
-cleanup:
-    mbedtls_ecdh_free(&ctx);
-    mbedtls_entropy_free(&entropy);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_pk_free(&our_pk);
-    return ret;
+    return 0;
 }
+
+
+void initialize_crypto(void)
+{
+    int ret;
+    const char *pers = "ecdh_decrypt";
+
+    // Initialize contexts
+    mbedtls_ecdh_init(&g_ecdh_ctx);
+    mbedtls_entropy_init(&g_entropy);
+    mbedtls_ctr_drbg_init(&g_ctr_drbg);
+    mbedtls_pk_init(&g_our_pk);
+
+    // Seed RNG
+    ret = mbedtls_ctr_drbg_seed(&g_ctr_drbg, mbedtls_entropy_func, &g_entropy,
+                              (const unsigned char *)pers, strlen(pers));
+    if (ret != 0) {
+        PRINTF("Failed to seed RNG: -0x%x\n", -ret);
+        return;
+    }
+
+    // Load our private key once
+    ret = mbedtls_pk_parse_key(&g_our_pk, (const unsigned char *)PRV_DEV_KEY_PEM,
+                            strlen(PRV_DEV_KEY_PEM) + 1, NULL, 0);
+    if (ret != 0) {
+        PRINTF("Failed to parse private key: -0x%x\n", -ret);
+        return;
+    }
+
+    g_crypto_initialized = 1;
+    //PRINTF("Crypto initialized successfully\n");
+}
+
+// Modify the WIFI_USART_IRQHandler function to add timing measurements (around line 664)
 void WIFI_USART_IRQHandler(void)
 {
    // Prevent infinite processing
    uint16_t safety_counter = 0;
    const uint16_t MAX_ITERATIONS = 5; // Prevent infinite loop
+   uint32_t reception_end_cycles = 0;
+
+   //DWT->CYCCNT = 0;
+   //reception_start_cycles = 0;
 
    while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART) &&
           safety_counter++ < MAX_ITERATIONS)
@@ -497,8 +471,12 @@ void WIFI_USART_IRQHandler(void)
                memcmp(&rxBuffer[bufferIndex - END_MARKER_LENGTH],
                      END_MARKER, END_MARKER_LENGTH) == 0)
            {
+               // Start timing the reception processing when we get a complete message
+
                // First, call original findMessage for existing logging
                findMessage(rxBuffer, bufferIndex);
+
+               reception_start_cycles = DWT->CYCCNT;
 
                // Find start of actual encryption data (skipping LOC-RESP)
                uint16_t dataStart = 0;
@@ -512,7 +490,7 @@ void WIFI_USART_IRQHandler(void)
                        break;
                    }
                }
-
+/*
                PRINTF("Raw message starting at offset %d:\n", dataStart);
                for(int i = 0; i < 32; i++) {
                    PRINTF("%02x ", rxBuffer[dataStart + i]);
@@ -525,24 +503,16 @@ void WIFI_USART_IRQHandler(void)
                    bufferIndex = 0;
                    continue;
                }
-
+*/
                // Calculate lengths after removing markers and LOC-RESP
                size_t total_message_length = dataEnd - dataStart;
 
                // Detailed hex dump of the entire message
-               // Option 1
-               PRINTF("Raw message data (%lu bytes):\n", (unsigned long)total_message_length);
-
-               // Option 2
-               PRINTF("Raw message data (%zd bytes):\n", total_message_length);
-
-               // Option 3
-               PRINTF("Raw message data (%d bytes):\n", (int)total_message_length);
+             /*  PRINTF("Raw message data (%d bytes):\n", (int)total_message_length);
                for (size_t i = 0; i < total_message_length; i++) {
                    PRINTF("%02x ", rxBuffer[dataStart + i]);
-                   //if ((i + 1) % 16 == 0) PRINTF("\n");
                }
-               PRINTF("\n");
+               PRINTF("\n");*/
 
                // If the total message length is too short, bail out
                if (total_message_length < (65 + 12 + 16)) {
@@ -579,10 +549,10 @@ void WIFI_USART_IRQHandler(void)
                    return;
                }
 
-               PRINTF("Nonce match - continuing with decryption\n");
+              // PRINTF("Nonce match - continuing with decryption\n");
 
                // Continue with normal decryption using ephemeral_public, iv, and encrypted_data
-               PRINTF("Ephemeral public key length: 65\n");
+            /*   PRINTF("Ephemeral public key length: 65\n");
                PRINTF("Detailed ephemeral public key:\n");
                for (int i = 0; i < 65; i++) {
                    PRINTF("%02x ", ephemeral_public[i]);
@@ -601,27 +571,36 @@ void WIFI_USART_IRQHandler(void)
                for (int i = 0; i < 16 && i < encrypted_length; i++) {
                    PRINTF("%02x ", encrypted_data[i]);
                }
-               PRINTF("\n");
+               PRINTF("\n");*/
 
                // Decrypt the message
                uint8_t decrypted_data[MAX_BUFFER_SIZE];
                size_t decrypted_length = 0;
 
                // Verbose error tracking
+               //reception_start_cycles = DWT->CYCCNT;
                int ret = decrypt_with_private_key(encrypted_data, encrypted_length,
-                                                  PRV_DEV_KEY_PEM,
-                                                  ephemeral_public, 65,
-                                                  iv,
-                                                  decrypted_data, &decrypted_length);
+                                              ephemeral_public, 65,
+                                              iv,
+                                              decrypted_data, &decrypted_length);
 
-               PRINTF("Decryption return code: %d (0x%x)\n", ret, -ret);
+               // Record end of reception processing
+
+               reception_end_cycles = DWT->CYCCNT;
+
+               // Print overall reception processing time
+              // PRINTF("=== Overall Reception Processing Time ===\n\r");
+               PRINTF("Total processing time: %u cycles\n\r",
+                      reception_end_cycles - reception_start_cycles);
+
+              // PRINTF("Decryption return code: %d (0x%x)\n\r", ret, -ret);
 
                if (ret == 0) {
                    // Decryption successful, forward decrypted data
                    USART_WriteBlocking(WIFI_USART2, decrypted_data, decrypted_length);
                }
-            else {
-                   PRINTF("Decryption failed with error: %d\r\n");//, ret);
+               else {
+                   PRINTF("Decryption failed with error: %d", ret);
                }
 
                // Reset buffer after processing
@@ -632,13 +611,15 @@ void WIFI_USART_IRQHandler(void)
        {
            // Buffer is full, reset it
            bufferIndex = 0;
+           //reception_start_cycles = DWT->CYCCNT;
        }
    }
 
    // If safety counter was hit, force buffer reset
    if (safety_counter >= MAX_ITERATIONS) {
        bufferIndex = 0;
-       PRINTF("USART Interrupt: Maximum iterations reached. Potential communication issue.\r\n");
+      // reception_start_cycles = DWT->CYCCNT;
+      // PRINTF("USART Interrupt: Maximum iterations reached. Potential communication issue.\r\n");
    }
 
    // Clear any receive errors
@@ -652,7 +633,7 @@ void WIFI_USART2_IRQHandler(void)
     while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART2))
     {
         uint8_t receivedByte = USART_ReadByte(WIFI_USART2);
-        PRINTF("USART2 Rex`ceived: 0x%02X\n", receivedByte);
+        PRINTF("USART2 Received: 0x%02X\n", receivedByte);
 
         // Process received data as needed
         // For now just print it
@@ -953,6 +934,7 @@ void announcement()
 	memcpy(msg+msg_len, &time_attest, TIME_SIZE);
 	msg_len += TIME_SIZE;
 
+	/*
 	PRINTF("\r\n=== Message Components Breakdown ===\r\n");
 
 		// Print n_dev (32 bytes)
@@ -1006,11 +988,11 @@ void announcement()
 		PRINTF("Full message (length %d): ", msg_len);
 		for(int i = 0; i < msg_len; i++) {
 		    PRINTF("%02X ", msg[i]);
-		}
+		}*/
 		PRINTF("\r\n");
 
 	USART_WriteBlocking(WIFI_USART, msg, msg_len);
-    //USART_WriteBlocking(WIFI_USART2, msg, msg_len);
+    USART_WriteBlocking(WIFI_USART2, msg, msg_len);
 
 }
 
@@ -1099,7 +1081,7 @@ int main(void)
 		PRINTF( "Initialization of crypto HW failed\n\r" );
 		while(1);
 	}
-	PRINTF ("HELLO WORLD\n\r");
+//	PRINTF ("HELLO WORLD\n\r");
 	/* Init SysTick module */
 	/* call CMSIS SysTick function. It enables the SysTick interrupt at low priority */
 	SysTick_Config(CLOCK_GetCoreSysClkFreq() / CONVERT_MS_TO_S); /* 1 ms period */
@@ -1132,6 +1114,7 @@ int main(void)
 								&entropy,
 								(const unsigned char *) "RANDOM_GEN",
 								10);
+	initialize_crypto();
 	if(ret != 0){while(1);}
 
 	DisableIRQ(WIFI_USART_IRQn);    // Disable USART interrupt
@@ -1140,19 +1123,19 @@ int main(void)
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[0] = DWT->CYCCNT;
 #endif
-	syncReq(req_buffer);
-	PRINTF("sync req \n\r");
+	//syncReq(req_buffer);
+	//PRINTF("sync req \n\r");
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[1] = DWT->CYCCNT;
 #endif
-	syncResp(req_buffer, resp_buffer);
-	PRINTF("sync resp \n\r");
+	//syncResp(req_buffer, resp_buffer);
+	//PRINTF("sync resp \n\r");
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[2] = DWT->CYCCNT;
 #endif
 
-	syncAck(resp_buffer);
-	PRINTF("sync ack \n\r");
+	//syncAck(resp_buffer);
+	//PRINTF("sync ack \n\r");
 	EnableIRQ(WIFI_USART_IRQn);     // Re-enable USART interrupt
 	EnableIRQ(WIFI_USART2_IRQn);    // Re-enable USART2 interrupt
    	/* init CTimer */
@@ -1172,6 +1155,14 @@ int main(void)
    	PRINTF("%u %u %u %u %u %u %u\n\r", cycle_records[0], cycle_records[1] - cycle_records[0], cycle_records[2] - cycle_records[1],
    			cycle_records[3] - cycle_records[2], cycle_records[3] - cycle_records[0], cycle_records[4] - cycle_records[3], cycle_records[4]);
 #endif
+
+   //	volatile uint32_t delay_outer, delay_inner;
+   //	for (delay_outer = 0; delay_outer < 100; delay_outer++) {
+   //	    for (delay_inner = 0; delay_inner < 1000000; delay_inner++) {}
+   //	}
+
+       // Reset the chip to restart the measurement
+   //    NVIC_SystemReset();
 
    	/* Boot the non-secure code. */
 	BootNonSecure(mainNONSECURE_APP_START_ADDRESS);

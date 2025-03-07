@@ -930,7 +930,7 @@ static void uart_task()
             if (strncmp((const char *)data + rxBytes - strlen("MSGEND"), "MSGEND", strlen("MSGEND")) == 0)
             {
                 // Handle manufacturer server communication
-                wifi_start_sta();
+               // wifi_start_sta();
                 udp_connection_w_mfr(data, rxBytes);
                 // Return to normal operation
                 ext_bleprph_advertise_init();
@@ -995,6 +995,8 @@ void app_main(void)
 
     // uart init
     uart_init();
+
+    wifi_start_sta();
 
     // nimble init
     ret = nimble_port_init();

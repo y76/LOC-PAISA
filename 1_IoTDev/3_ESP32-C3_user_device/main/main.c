@@ -36,6 +36,7 @@ Next steps.
 #include "sdkconfig.h"
 #include "driver/uart.h"
 #include "esp_wifi.h"
+#include "esp_timer.h"
 #include "esp_event.h"
 #include "nvs_flash.h"
 #include "esp_http_client.h"
@@ -55,6 +56,8 @@ Next steps.
 #define EXAMPLE_ESP_WIFI_SSID "THE BEST TP LINK"
 #define EXAMPLE_ESP_WIFI_PASS "ZOTzot2023"
 #define EXAMPLE_ESP_MAXIMUM_RETRY 5
+static bool first_response_recorded = false;
+static bool metrics_fully_populated = false;
 
 static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
@@ -107,6 +110,105 @@ typedef struct
     uint32_t key6;
     uint32_t key7;
 } aes_key_t;
+
+// Structure to hold all performance metrics
+typedef struct {
+    // MessageAnnounce Processing - Detailed Breakdown
+    int64_t msganno_receive_time;            // Time when MessageAnnounce is first received
+    
+    int64_t url_extraction_start;            // Start time for URL extraction
+    int64_t url_extraction_end;              // End time for URL extraction
+    int64_t url_extraction_time;             // Time to extract URL from announcement
+    
+    int64_t manifest_fetch_start;            // Start time for manifest fetching
+    int64_t manifest_fetch_end;              // End time for manifest fetching
+    int64_t manifest_fetch_time;             // Time to fetch manifest from server
+    
+    int64_t key_extraction_start;            // Start time for extracting keys
+    int64_t key_extraction_end;              // End time for extracting keys
+    int64_t key_extraction_time;             // Time to extract keys from certificates
+    
+    int64_t manifest_verify_start;           // Start time for manifest signature verification
+    int64_t manifest_verify_end;             // End time for manifest signature verification
+    int64_t manifest_verify_time;            // Time to verify manifest signature
+    
+    int64_t msganno_verify_start;            // Start time for MessageAnnounce signature verification
+    int64_t msganno_verify_end;              // End time for MessageAnnounce signature verification
+    int64_t msganno_verify_time;             // Time to verify MessageAnnounce signature
+    
+    int64_t total_verification_time;         // Total time for entire verification process
+    
+    // STS Key Generation and Encryption
+    int64_t shared_secret_gen_start;         // Start time for shared secret generation
+    int64_t shared_secret_gen_end;           // End time for shared secret generation
+    int64_t shared_secret_gen_time;          // Time to generate shared secret
+    
+    int64_t sts_encrypt_start;               // Start time for STS parameter encryption
+    int64_t sts_encrypt_end;                 // End time for STS parameter encryption
+    int64_t sts_encrypt_time;                // Time to encrypt STS parameters
+    
+    // End-to-End Latency
+    int64_t msgresp_send_time;               // Time when BLE Msgresp is sent
+    int64_t uwb_response_time;               // Time when first UWB data is received via UART
+    int64_t ble_to_uwb_latency;              // Time from BLE send to UWB response
+    
+    int64_t msganno_reception_time;          // Time when MessageAnnounce is received (duplicate of msganno_receive_time)
+    int64_t total_e2e_latency;               // Total time from MessageAnnounce to UWB response
+} paisa_metrics_t;
+
+// Global metrics struct
+paisa_metrics_t metrics = {0};
+
+// Function to log all metrics
+void log_performance_metrics(void) {
+    ESP_LOGI("METRICS", "========== PAISA Performance Metrics ==========");
+    
+    // Detailed MessageAnnounce Processing
+    ESP_LOGI("METRICS", "--- MessageAnnounce Processing Breakdown ---");
+    ESP_LOGI("METRICS", "URL Extraction Time: %lld μs (%lld ms)", 
+             metrics.url_extraction_time, metrics.url_extraction_time / 1000);
+    
+    ESP_LOGI("METRICS", "Manifest Fetch Time: %lld μs (%lld ms)", 
+             metrics.manifest_fetch_time, metrics.manifest_fetch_time / 1000);
+    
+    ESP_LOGI("METRICS", "Key Extraction Time: %lld μs (%lld ms)", 
+             metrics.key_extraction_time, metrics.key_extraction_time / 1000);
+    
+    ESP_LOGI("METRICS", "Manifest Signature Verification Time: %lld μs (%lld ms)", 
+             metrics.manifest_verify_time, metrics.manifest_verify_time / 1000);
+    
+    ESP_LOGI("METRICS", "MessageAnnounce Signature Verification Time: %lld μs (%lld ms)", 
+             metrics.msganno_verify_time, metrics.msganno_verify_time / 1000);
+    
+    ESP_LOGI("METRICS", "Total Verification Process Time: %lld μs (%lld ms)", 
+             metrics.total_verification_time, metrics.total_verification_time / 1000);
+    
+    // Cryptographic Operations
+    ESP_LOGI("METRICS", "--- Cryptographic Operations ---");
+    ESP_LOGI("METRICS", "Shared Secret Generation Time: %lld μs (%lld ms)", 
+             metrics.shared_secret_gen_time, metrics.shared_secret_gen_time / 1000);
+    
+    ESP_LOGI("METRICS", "STS Parameters Encryption Time: %lld μs (%lld ms)", 
+             metrics.sts_encrypt_time, metrics.sts_encrypt_time / 1000);
+    
+    // End-to-End Latency
+    ESP_LOGI("METRICS", "--- End-to-End Latency ---");
+    ESP_LOGI("METRICS", "BLE Msgresp to UWB Response Latency: %lld μs (%lld ms)", 
+             metrics.ble_to_uwb_latency, metrics.ble_to_uwb_latency / 1000);
+    
+    ESP_LOGI("METRICS", "Total E2E Latency (MessageAnnounce to UWB): %lld μs (%lld ms)", 
+             metrics.total_e2e_latency, metrics.total_e2e_latency / 1000);
+    
+    ESP_LOGI("METRICS", "==============================================");
+}
+
+// Helper function to reset metrics for a new measurement cycle
+void reset_metrics(void) {
+    memset(&metrics, 0, sizeof(metrics));
+    first_response_recorded = false;
+    metrics_fully_populated = false;
+    ESP_LOGI("METRICS", "Metrics reset for new measurement cycle");
+}
 
 static const char *TAG = "BLE_RECEIVER";
 static int ble_gap_event(struct ble_gap_event *event, void *arg);
@@ -167,6 +269,40 @@ void uart_init(void)
     ESP_LOGI(TAG, "UART init done");
 }
 
+static void ble_scanner_init(void)
+{
+    int rc;
+
+    rc = ble_hs_id_infer_auto(0, &own_addr_type);
+    if (rc != 0)
+    {
+        ESP_LOGE(TAG, "Error determining address type; rc=%d", rc);
+        return;
+    }
+
+    struct ble_gap_disc_params scan_params = {
+        .itvl = BLE_GAP_SCAN_ITVL_MS(100),
+        .window = BLE_GAP_SCAN_WIN_MS(50),
+        .filter_duplicates = 0, // Don't filter duplicates
+        .limited = 0,           // Don't limit discovery
+        .passive = 0,           // Use active scanning
+        .filter_policy = 0      // No filtering
+    };
+
+    // Start regular scanning instead of extended
+    rc = ble_gap_disc(own_addr_type, 0, // Duration (0 = scan continuously)
+                      &scan_params,
+                      ble_gap_event, NULL);
+
+    if (rc != 0)
+    {
+        ESP_LOGE(TAG, "Error initiating scan; rc=%d", rc);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Scanner started successfully");
+}
+
 static void uart_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "UART task started");
@@ -185,47 +321,67 @@ static void uart_task(void *pvParameters)
             // Null-terminate the data (for string operations if needed)
             data[rxBytes] = 0;
             
-            // Log received data
-            ESP_LOGI(TAG, "Received %d bytes from UART:", rxBytes);
-            
-            // Print as hex
-            printf("HEX: ");
+            // Check for the 'a' character to reset measurement
             for (int i = 0; i < rxBytes; i++) {
-                printf("%02X ", data[i]);
-                if ((i + 1) % 16 == 0) {
-                    printf("\n     ");
+                if (data[i] == 'a') {
+                    // Reset the measurement flag when 'a' is received
+                    first_response_recorded = false;
+                    //ESP_LOGI(TAG, "Received 'a' character - resetting measurement cycle");
+                  // ESP_LOGI(TAG, "Ready for new MessageAnnounce reception");
+                    break;
                 }
             }
-            printf("\n");
             
-            // Print as ASCII (where printable)
-            printf("ASCII: ");
+            // Check specifically for the 'b' character
+            bool received_b_character = false;
             for (int i = 0; i < rxBytes; i++) {
-                if (data[i] >= 32 && data[i] <= 126) {
-                    printf("%c", data[i]);
-                } else {
-                    printf(".");
+                if (data[i] == 'b') {
+                    received_b_character = true;
+                    //ESP_LOGI(TAG, "Received 'b' character from UWB board - this indicates ranging has started");
+                    break;
                 }
             }
-            printf("\n");
             
-            // Process received data based on content or protocol
-            // Check for specific end markers or commands
-            
-            // Example: Check for a specific end marker
-            if (rxBytes > 6 && memcmp(&data[rxBytes - 6], "MSGEND", 6) == 0) {
-                ESP_LOGI(TAG, "Received message with MSGEND marker");
-                // Process message
+            // Only process metrics if we received the 'b' character
+            if (received_b_character && !first_response_recorded) {
+                // Record UWB response time
+                metrics.uwb_response_time = esp_timer_get_time();
                 
-                // Example response
-                uint8_t response[] = "ACK: Message received";
-            //    send_uart_data(response, sizeof(response) - 1); // -1 to exclude null terminator
-            } 
-            // Add other protocol-specific handlers here
+                // Calculate latencies
+                metrics.ble_to_uwb_latency = metrics.uwb_response_time - metrics.msgresp_send_time;
+                
+                // Sanity check for latency values
+                if (metrics.ble_to_uwb_latency < 0 || metrics.ble_to_uwb_latency > 10000000) {
+                    ESP_LOGW(TAG, "Warning: Suspicious BLE to UWB latency value: %lld ms", 
+                            metrics.ble_to_uwb_latency / 1000);
+                } else {
+                    ESP_LOGI(TAG, "BLE to UWB latency: %lld μs (%lld ms)", 
+                            metrics.ble_to_uwb_latency, metrics.ble_to_uwb_latency / 1000);
+                }
+                
+                metrics.total_e2e_latency = metrics.uwb_response_time - metrics.msganno_reception_time;
+                ESP_LOGI(TAG, "Total E2E latency: %lld μs (%lld ms)", 
+                         metrics.total_e2e_latency, metrics.total_e2e_latency / 1000);
+                
+                // Log all performance metrics
+                log_performance_metrics();
+                
+                // Mark that we've recorded the first response
+                first_response_recorded = true;
+                
+                ESP_LOGI(TAG, "=========================================");
+                ESP_LOGI(TAG, "First UWB ranging start ('b') after BLE message recorded");
+                ESP_LOGI(TAG, "Further UART messages will be processed but timing ignored");
+                ESP_LOGI(TAG, "until 'a' is received or next MessageAnnounce reception");
+                ESP_LOGI(TAG, "=========================================");
+                esp_restart();
+                ble_scanner_init();
+            }
+            
+            // Process other UART data as needed...
         }
     }
     
-    // This code is never reached but good practice
     free(data);
     vTaskDelete(NULL);
 }
@@ -259,19 +415,19 @@ static void send_uart_data(const uint8_t *data, uint8_t data_len)
     pos += end_marker_len;
 
     // Print complete message before sending
-    printf("Sending message (hex): ");
-    for (size_t i = 0; i < pos; i++)
-    {
-        printf("%02X", (unsigned char)buf[i]);
-    }
-    printf("\nSending message (ASCII): ");
-    for (size_t i = 0; i < pos; i++)
-    {
-        printf("%c", buf[i]);
-    }
-    printf("\n");
+  //  printf("Sending message (hex): ");
+  //  for (size_t i = 0; i < pos; i++)
+  //  {
+ //       printf("%02X", (unsigned char)buf[i]);
+ //   }
+  //  printf("\nSending message (ASCII): ");
+  //  for (size_t i = 0; i < pos; i++)
+ //   {
+  //      printf("%c", buf[i]);
+   // }
+   // printf("\n");
 
-    ESP_LOGI(TAG, "Sending complete message:");
+   // ESP_LOGI(TAG, "Sending complete message:");
     uart_write_bytes(ECHO_UART_PORT_NUM, buf, pos);
 
     free(buf);
@@ -362,14 +518,14 @@ static void send_ble_message(uint8_t *data, size_t data_len)
     memcpy(&adv_data[7], prefix, prefix_len);
     memcpy(&adv_data[7 + prefix_len], data, data_len);
 
-    printf("  Complete packet (hex):\n    ");
-    for (size_t i = 0; i < total_adv_length; i++) {
-        printf("%02X ", adv_data[i]);
-        if ((i + 1) % 16 == 0 && i < total_adv_length - 1) {
-            printf("\n    ");
-        }
-    }
-    printf("\n");
+   // printf("  Complete packet (hex):\n    ");
+   // for (size_t i = 0; i < total_adv_length; i++) {
+   //     printf("%02X ", adv_data[i]);
+   //     if ((i + 1) % 16 == 0 && i < total_adv_length - 1) {
+   //         printf("\n    ");
+   //     }
+   // }
+   // printf("\n");
 
     // Rest of function same as before
     struct os_mbuf *mbuf;
@@ -500,13 +656,13 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
     int offset = 7 + 9; // Skip BLE header and LOC-PAISA
 
     // n_dev (32 bytes)
-    ESP_LOGI(TAG, "n_dev (32 bytes): ");
+   // ESP_LOGI(TAG, "n_dev (32 bytes): ");
     for (int i = 0; i < 32; i++)
     {
-        printf("%02X ", data[offset + i]);
+   //     printf("%02X ", data[offset + i]);
         global_n_dev[i] = data[offset + i];
     }
-    printf("\n");
+    //printf("\n");
     offset += 32;
 
     // curTS (4 bytes)
@@ -525,11 +681,11 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
     ESP_LOGI(TAG, "signature (%d bytes): ", sig_len);
     for (int i = sig_start; i < sig_end; i++)
     {
-        printf("%02X ", data[i]);
+   //     printf("%02X ", data[i]);
         global_signature[i - sig_start] = data[i];
     }
     global_signature_len = sig_len;
-    printf("\n");
+  //  printf("\n");
 
     // Print URL
     uint8_t url_len = data[length - 6];
@@ -537,26 +693,26 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
     ESP_LOGI(TAG, "M_SRV_URL (%d bytes): ", url_len);
     for (int i = 0; i < url_len; i++)
     {
-        printf("%c", data[length - 6 - url_len + i]);
+   //     printf("%c", data[length - 6 - url_len + i]);
         global_url[i] = data[length - 6 - url_len + i];
     }
     global_url[url_len] = '\0';
-    printf("\n");
+  //  printf("\n");
 
     // url_len
-    ESP_LOGI(TAG, "m_srv_url_len (1 byte): %02X (Decimal: %u)", url_len, url_len);
+  //  ESP_LOGI(TAG, "m_srv_url_len (1 byte): %02X (Decimal: %u)", url_len, url_len);
 
     // attest_result
     global_attest_result = data[length - 5];
-    ESP_LOGI(TAG, "attest_result (1 byte): %02X", global_attest_result);
+  //  ESP_LOGI(TAG, "attest_result (1 byte): %02X", global_attest_result);
 
     // time_attest
     uint32_t time_attest = data[length - 4] | (data[length - 3] << 8) |
                            (data[length - 2] << 16) | (data[length - 1] << 24);
     global_time_attest = time_attest;
-    ESP_LOGI(TAG, "time_attest (4 bytes): %02X %02X %02X %02X (Decimal: %lu)",
-             data[length - 4], data[length - 3], data[length - 2], data[length - 1],
-             (unsigned long)time_attest);
+  //  ESP_LOGI(TAG, "time_attest (4 bytes): %02X %02X %02X %02X (Decimal: %lu)",
+        //     data[length - 4], data[length - 3], data[length - 2], data[length - 1],
+      //       (unsigned long)time_attest);
 
     // Rest of the existing print_adv_data function...
 }
@@ -708,39 +864,7 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
     }
 }*/
 
-static void ble_scanner_init(void)
-{
-    int rc;
 
-    rc = ble_hs_id_infer_auto(0, &own_addr_type);
-    if (rc != 0)
-    {
-        ESP_LOGE(TAG, "Error determining address type; rc=%d", rc);
-        return;
-    }
-
-    struct ble_gap_disc_params scan_params = {
-        .itvl = BLE_GAP_SCAN_ITVL_MS(100),
-        .window = BLE_GAP_SCAN_WIN_MS(50),
-        .filter_duplicates = 0, // Don't filter duplicates
-        .limited = 0,           // Don't limit discovery
-        .passive = 0,           // Use active scanning
-        .filter_policy = 0      // No filtering
-    };
-
-    // Start regular scanning instead of extended
-    rc = ble_gap_disc(own_addr_type, 0, // Duration (0 = scan continuously)
-                      &scan_params,
-                      ble_gap_event, NULL);
-
-    if (rc != 0)
-    {
-        ESP_LOGE(TAG, "Error initiating scan; rc=%d", rc);
-        return;
-    }
-
-    ESP_LOGI(TAG, "Scanner started successfully");
-}
 
 // Helper function to check for LOC-PAISA in advertisement data
 static bool contains_loc_paisa(const uint8_t *data)
@@ -1062,7 +1186,7 @@ void extract_public_key()
     strncpy(public_key, (const char *)buf, PUBKEY_BUFFER_SIZE - 1);
     public_key[PUBKEY_BUFFER_SIZE - 1] = '\0'; // Null terminate the string
 
-    ESP_LOGI(TAG, "Extracted EC Public Key:\n%s", public_key);
+  //  ESP_LOGI(TAG, "Extracted EC Public Key:\n%s", public_key);
 
     // Clean up
     mbedtls_x509_crt_free(&cert);
@@ -1071,10 +1195,11 @@ void extract_public_key()
 void display_paisa_info(const char *url)
 {
     ESP_LOGI(TAG, "Device URL: %s", url);
+    metrics.manifest_fetch_start = esp_timer_get_time();
 
     esp_http_client_config_t config = {
-        .host = "bit.ly",
-        .path = "/3EJadxK",
+        .host = "drive.usercontent.google.com",
+        .path = "/uc?id=1H2cCloHdzEVRY0KFEY_1OIBR0W87Iq1l&export=download",
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .cert_pem = NULL,
         .skip_cert_common_name_check = true,
@@ -1092,13 +1217,16 @@ void display_paisa_info(const char *url)
     }
 
     esp_err_t err = esp_http_client_perform(client);
+    metrics.manifest_fetch_end = esp_timer_get_time();
+    metrics.manifest_fetch_time = metrics.manifest_fetch_end - metrics.manifest_fetch_start;
+    ESP_LOGI(TAG, "Manifest fetch time: %lld μs", metrics.manifest_fetch_time);
     if (err == ESP_OK)
     {
         int status = esp_http_client_get_status_code(client);
-        ESP_LOGI(TAG, "HTTP Status = %d", status);
+   //     ESP_LOGI(TAG, "HTTP Status = %d", status);
 
-        ESP_LOGI(TAG, "Actual Response Length: %d bytes", response_len);
-        ESP_LOGI(TAG, "RAW MESSAGE: %.*s", response_len, response_buffer);
+   //     ESP_LOGI(TAG, "Actual Response Length: %d bytes", response_len);
+   //     ESP_LOGI(TAG, "RAW MESSAGE: %.*s", response_len, response_buffer);
 
         // Extract device_id
         const char *device_id_start = strstr(response_buffer, "device_id:");
@@ -1116,7 +1244,7 @@ void display_paisa_info(const char *url)
                     device_id_str[id_len] = '\0';
                     // Convert string to integer
                     global_device_id = (uint32_t)strtoul(device_id_str, NULL, 10);
-                    ESP_LOGI(TAG, "Device ID extracted: %lu", (unsigned long)global_device_id);
+    //                ESP_LOGI(TAG, "Device ID extracted: %lu", (unsigned long)global_device_id);
                 }
                 else
                 {
@@ -1423,36 +1551,36 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
                                          65);
 
     // Diagnostic prints
-    ESP_LOGI(TAG, "Ephemeral public key export:");
-    ESP_LOGI(TAG, "Return code: -0x%x", -ret);
-    ESP_LOGI(TAG, "Exported key length: %zu", public_key_len);
+   // ESP_LOGI(TAG, "Ephemeral public key export:");
+   // ESP_LOGI(TAG, "Return code: -0x%x", -ret);
+   // ESP_LOGI(TAG, "Exported key length: %zu", public_key_len);
 
     // Print the first few bytes of the exported key
-    ESP_LOGI(TAG, "First 8 bytes of ephemeral public key:");
-    for (int i = 0; i < 65; i++)
-    {
-        printf("%02x ", out_ephemeral_public[i]);
-    }
-    printf("\n");
-
+    //ESP_LOGI(TAG, "First 8 bytes of ephemeral public key:");
+   // for (int i = 0; i < 65; i++)
+   // {
+  //      printf("%02x ", out_ephemeral_public[i]);
+ //   }
+  //  printf("\n");
+//
     // Copy the IV
     memcpy(out_iv, iv, 12);
 
     // Print shared secret in hex
-    ESP_LOGI(TAG, "Shared secret:");
-    for (int i = 0; i < 32; i++)
-    {
-        printf("%02x", shared_secret[i]);
-    }
-    printf("\n");
+  //  ESP_LOGI(TAG, "Shared secret:");
+ //   for (int i = 0; i < 32; i++)
+ //   {
+  //      printf("%02x", shared_secret[i]);
+ //   }
+  //  printf("\n");
 
     // Print encrypted data in hex
-    ESP_LOGI(TAG, "Encrypted data + tag (%d bytes):", *encrypted_len);
-    for (int i = 0; i < *encrypted_len; i++)
-    {
-        printf("%02x", encrypted_data[i]);
-    }
-    printf("\n");
+  //  ESP_LOGI(TAG, "Encrypted data + tag (%d bytes):", *encrypted_len);
+   // for (int i = 0; i < *encrypted_len; i++)
+  //  {
+  //      printf("%02x", encrypted_data[i]);
+  //  }
+  //  printf("\n");
 
     // Separate the tag from encrypted data for decryption
     // uint8_t *decrypted = (uint8_t*)malloc(data_len);
@@ -1476,19 +1604,19 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
     if (ret == 0)
     {
         ESP_LOGI(TAG, "Decryption successful");
-        ESP_LOGI(TAG, "Decrypted text: ");
-        for (int i = 0; i < data_len; i++)
-        {
-            printf("%c", decrypted[i]);
-        }
-        printf("\n");
+     //   ESP_LOGI(TAG, "Decrypted text: ");
+     //   for (int i = 0; i < data_len; i++)
+     //   {
+      //      printf("%c", decrypted[i]);
+     //   }
+     //   printf("\n");
 
-        ESP_LOGI(TAG, "Decrypted data (hex):");
-        for (int i = 0; i < data_len; i++)
-        {
-            printf("%02x", decrypted[i]);
-        }
-        printf("\n");
+    //    ESP_LOGI(TAG, "Decrypted data (hex):");
+    //    for (int i = 0; i < data_len; i++)
+     //   {
+     //       printf("%02x", decrypted[i]);
+      //  }
+      //  printf("\n");
     }
     else
     {
@@ -1628,32 +1756,32 @@ static bool verify_manifest_signature(void) {
     mbedtls_sha256_finish(&sha256, digest);
     mbedtls_sha256_free(&sha256);
 
-    ESP_LOGI(TAG, "Content being hashed (ASCII):");
-    for(size_t i = 0; i < content_len; i++) {
-        if(response_buffer[i] >= 32 && response_buffer[i] <= 126) {
+   // ESP_LOGI(TAG, "Content being hashed (ASCII):");
+   // for(size_t i = 0; i < content_len; i++) {
+     //   if(response_buffer[i] >= 32 && response_buffer[i] <= 126) {
             // Printable character
-            printf("%c", response_buffer[i]);
-        } else if(response_buffer[i] == '\n') {
-            printf("\n");
-        } else {
+    //        printf("%c", response_buffer[i]);
+     //   } else if(response_buffer[i] == '\n') {
+     //       printf("\n");
+     //   } else {
             // Non-printable character
-            printf(".");
-        }
-    }
-    printf("\n\n");
+     //       printf(".");
+      //  }
+    //}
+   // printf("\n\n");
 
-    ESP_LOGI(TAG, "Content being hashed (HEX):");
-    for(size_t i = 0; i < content_len; i++) {
-        printf("%02x ", (unsigned char)response_buffer[i]);
-        if((i + 1) % 16 == 0) printf("\n");
-    }
-    printf("\n");
+   // ESP_LOGI(TAG, "Content being hashed (HEX):");
+  //  for(size_t i = 0; i < content_len; i++) {
+  //      printf("%02x ", (unsigned char)response_buffer[i]);
+   //     if((i + 1) % 16 == 0) printf("\n");
+   // }
+   // printf("\n");
 
-    ESP_LOGI(TAG, "Resulting hash:");
-    for(int i = 0; i < 32; i++) {
-        printf("%02x", digest[i]);
-    }
-    printf("\n");
+   // ESP_LOGI(TAG, "Resulting hash:");
+  //  for(int i = 0; i < 32; i++) {
+   //     printf("%02x", digest[i]);
+   // }
+   // printf("\n");
 
     // Extract signature
     sig_start += strlen("signature_of_manifest:");
@@ -1677,8 +1805,8 @@ static bool verify_manifest_signature(void) {
     }
     clean_sig[clean_pos] = '\0';
 
-    ESP_LOGI(TAG, "Raw signature with newlines: %s", sig_start);
-    ESP_LOGI(TAG, "Cleaned signature for base64: %s", clean_sig);
+  //  ESP_LOGI(TAG, "Raw signature with newlines: %s", sig_start);
+  //  ESP_LOGI(TAG, "Cleaned signature for base64: %s", clean_sig);
 
     // Decode base64 signature
     unsigned char *decoded_sig = malloc(clean_pos);  // Use clean_pos instead of sig_b64_len
@@ -1694,12 +1822,12 @@ static bool verify_manifest_signature(void) {
         return false;
     }
 
-    ESP_LOGI(TAG, "Decoded signature length: %d", decoded_len);
-    ESP_LOGI(TAG, "Decoded signature bytes:");
-    for(size_t i = 0; i < decoded_len; i++) {
-        printf("%02x", decoded_sig[i]);
-    }
-    printf("\n");
+  //  ESP_LOGI(TAG, "Decoded signature length: %d", decoded_len);
+  //  ESP_LOGI(TAG, "Decoded signature bytes:");
+  //  for(size_t i = 0; i < decoded_len; i++) {
+  //      printf("%02x", decoded_sig[i]);
+  //  }
+  //  printf("\n");
 
     // Initialize key verification
     mbedtls_pk_context pk;
@@ -1740,6 +1868,16 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
 
         if (debug_disc->data != NULL && debug_disc->data[4] == 0xFF && contains_loc_paisa(debug_disc->data))
         {
+            ble_gap_disc_cancel();
+            int64_t start_time = esp_timer_get_time();
+            metrics.msganno_reception_time = start_time;
+            metrics.msganno_receive_time = start_time;
+
+            
+            // Reset metrics for new measurement cycle
+            //reset_metrics();
+            metrics.msganno_reception_time = start_time;
+            metrics.msganno_receive_time = start_time;
 
             // CHECK TIMESTAMP FRESHNESS
             if (!is_timestamp_valid(debug_disc->data))
@@ -1755,24 +1893,38 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
 
             // Log the sender's address
             char addr_str[18];
-            snprintf(addr_str, sizeof(addr_str), "%02x:%02x:%02x:%02x:%02x:%02x",
-                     disc->addr.val[5], disc->addr.val[4], disc->addr.val[3],
-                     disc->addr.val[2], disc->addr.val[1], disc->addr.val[0]);
-            ESP_LOGI(TAG, "Sender address: %s", addr_str);
+          //  snprintf(addr_str, sizeof(addr_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+          //           disc->addr.val[5], disc->addr.val[4], disc->addr.val[3],
+          //           disc->addr.val[2], disc->addr.val[1], disc->addr.val[0]);
+          //  ESP_LOGI(TAG, "Sender address: %s", addr_str);
 
             // TODO
             // VERIFY MANIFEST IDEV SIGNATURE USIGN PKMSR
 
             // TODO
             // VERIFY MSGANNO SIGNATURE USING PKIDEV
-
-            // PRINT OUT PAISA INFORMATION
+            metrics.url_extraction_start = esp_timer_get_time();
+                        // PRINT OUT PAISA INFORMATION
             extract_and_display_url(debug_disc->data, total_length);
+
+            metrics.url_extraction_end = esp_timer_get_time();
+            metrics.url_extraction_time = metrics.url_extraction_end - metrics.url_extraction_start;
+            ESP_LOGI(TAG, "URL extraction time: %lld μs", metrics.url_extraction_time);
+
+            metrics.key_extraction_start = esp_timer_get_time();
+
             // PRINT out the manifest + the announcement information (neatly)
             if (strlen(certificate_of_device) > 0 && strlen(certificate_of_manufacturer) > 0)
             {
                 // extract_public_key();
                 extract_public_keys();
+
+                metrics.key_extraction_end = esp_timer_get_time();
+                metrics.key_extraction_time = metrics.key_extraction_end - metrics.key_extraction_start;
+                ESP_LOGI(TAG, "Key extraction time: %lld μs", metrics.key_extraction_time);
+
+                metrics.manifest_verify_start = esp_timer_get_time();
+
 
                 // First verify the manifest signature
                 if (!verify_manifest_signature())
@@ -1780,7 +1932,14 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                     ESP_LOGE(TAG, "Manifest signature verification failed");
                     return 0;
                 }
-                ESP_LOGI(TAG, "Manifest signature verified successfully");
+           // End manifest verification timing
+           metrics.manifest_verify_end = esp_timer_get_time();
+           metrics.manifest_verify_time = metrics.manifest_verify_end - metrics.manifest_verify_start;
+           ESP_LOGI(TAG, "Manifest signature verification time: %lld μs", metrics.manifest_verify_time);
+           
+           ESP_LOGI(TAG, "Manifest signature verified successfully");
+
+           metrics.msganno_verify_start = esp_timer_get_time();
 
                 // Then verify the message announcement signature
                 if (!verify_msganno_signature(debug_disc->data, total_length))
@@ -1788,9 +1947,14 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                     ESP_LOGE(TAG, "Message announcement signature verification failed");
                     return 0;
                 }
+                metrics.msganno_verify_end = esp_timer_get_time();
+                metrics.msganno_verify_time = metrics.msganno_verify_end - metrics.msganno_verify_start;
+                ESP_LOGI(TAG, "Message announcement verification time: %lld μs", metrics.msganno_verify_time);
                 ESP_LOGI(TAG, "Message announcement signature verified successfully");
-
-                // Temporarily stop scanning while we send our response
+                metrics.total_verification_time = esp_timer_get_time() - metrics.msganno_receive_time;
+                ESP_LOGI(TAG, "Total verification process time: %lld μs", metrics.total_verification_time);
+                
+                ESP_LOGI(TAG, "Message announcement signature verified successfully");
                 ble_gap_disc_cancel();
 
                 // Generate STS Key
@@ -1846,12 +2010,15 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 // memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &aes_key, sizeof(aes_key));
                 // send_uart_data(crypto_data, sizeof(crypto_data));
 
+                metrics.sts_encrypt_start = esp_timer_get_time();
+
+
                 uint8_t crypto_data[36]; // 16 (STS key) + 16 (STS IV) + 2 (src_addr) + 2 (dst_addr)
                 memcpy(crypto_data, &sts_key, sizeof(sts_key));
                 memcpy(crypto_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
                 memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &src_addr, sizeof(src_addr));
                 memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv) + sizeof(src_addr), &dst_addr, sizeof(dst_addr));
-                send_uart_data(crypto_data, sizeof(crypto_data));
+               // send_uart_data(crypto_data, sizeof(crypto_data));
 
                 /*
                 uint8_t encrypted_sts_data[256]; // Adjust size as needed
@@ -1871,12 +2038,27 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 uint8_t ephemeral_public[65];
                 uint8_t iv[12];
 
+                metrics.shared_secret_gen_start = esp_timer_get_time();
+
+
                 // Updated function call with new parameters
                 int ret = encrypt_with_public_key(crypto_data, sizeof(crypto_data),
                                                   public_key,
                                                   encrypted_sts_data, &encrypted_length,
                                                   ephemeral_public, // Pass buffer for public key
                                                   iv);              // Pass buffer for IV
+
+
+                                                  metrics.shared_secret_gen_end = esp_timer_get_time();
+                                                  metrics.shared_secret_gen_time = metrics.shared_secret_gen_end - metrics.shared_secret_gen_start;
+                                                  
+                                                  // End STS encryption time measurement
+                                                  metrics.sts_encrypt_end = esp_timer_get_time();
+                                                  metrics.sts_encrypt_time = metrics.sts_encrypt_end - metrics.sts_encrypt_start;
+                                                  
+                                                  ESP_LOGI(TAG, "Shared secret generation time: %lld μs", metrics.shared_secret_gen_time);
+                                                  ESP_LOGI(TAG, "STS encryption time: %lld μs", metrics.sts_encrypt_time);
+
 
                 if (ret == 0)
                 {
@@ -1889,12 +2071,17 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                     total_length += 12;
                     memcpy(complete_message + total_length, encrypted_sts_data, encrypted_length);
                     total_length += encrypted_length;
-
+                    metrics.msgresp_send_time = esp_timer_get_time();
+                    send_uart_data(crypto_data, sizeof(crypto_data));
                     send_ble_message(complete_message, total_length);
+                    ESP_LOGI(TAG, "BLE response sent at: %lld μs", metrics.msgresp_send_time);
+                    metrics_fully_populated = true;
+                    //first_response_recorded = false;
+
                 }
 
                 vTaskDelay(pdMS_TO_TICKS(1000));
-                ble_scanner_init();
+                //ble_scanner_init();
             }
             else
             {
@@ -1919,6 +2106,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
 
     default:
         ESP_LOGI(TAG, "Other unhandled BLE GAP event: %d", event->type);
+        ble_scanner_init();
         break;
     }
     return 0;
