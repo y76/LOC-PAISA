@@ -1,14 +1,11 @@
-# Caveat (IoT) Emptor: Towards Transparency of IoT Device Presence
+# LOCO: Secure Localization and Awareness of Ambient IoT Devices
 
 **[THIS REPOSITORY IS UNDER CONSTRUCTION]**
 
-As many types of IoT devices worm their way into numerous settings and many aspects of our daily lives, awareness of their presence and functionality becomes a source of major concern. Hidden IoT devices can snoop (via sensing) on nearby unsuspecting users, and impact the environment where unaware users are present, via actuation. This prompts, respectively, privacy and security/safety issues. The dangers of hidden IoT devices have been recognized and prior research suggested some means of mitigation, mostly based on traffic analysis or using specialized hardware to uncover devices. While such approaches are partially effective, there is currently no comprehensive approach to IoT device transparency. 
 
-In part, motivated by recent privacy regulations (GDPR and CCPA), this paper motivates the need for, and constructs, a \privacyaware\ Root-of-Trust architecture for IoT devices, called \paisa: <u>P</u>rivacy-<u>A</u>ware <u>I</u>oT <u>S</u>ensing and <u>A</u>ctuation. It guarantees timely and secure announcements about IoT devices' presence and their capabilities. \paisa has two components: one on the IoT device that guarantees periodic announcements of its presence even if all device software is compromised, and the other that runs on the user device, which captures and processes announcements.  Notably, \paisa requires no hardware modifications; it uses an off-the-shelf Trusted Execution Environment (e.g., ARM TrustZone).  This work also comprises a fully functional (open-sourced) prototype implementation of \paisa, which includes: an IoT device that makes announcements via IEEE 802.11 WiFi beacons and an Android smartphone-based app that captures and processes announcements. Both security and performance of \paisa design and prototype are discussed. 
-
-## PAISA Directory Structure
-
-    PAISA
+## LOCO Directory Structure
+## TODO
+    LOCO
     ├── 1_IoTDev
     │   ├── 1_NXPBoard
     │   │   ├── freertos_blinky_ns
@@ -44,17 +41,19 @@ In part, motivated by recent privacy regulations (GDPR and CCPA), this paper mot
 
 ### Hardware Requirement
 
+## TODO
+
 #### IoT Device
 1. [NXP LPC55S69 board](https://www.nxp.com/design/software/development-software/mcuxpresso-software-and-tools-/lpcxpresso-boards/lpcxpresso55s69-development-board:LPC55S69-EVK) (based on Cortex-M33 equiped with Trustzone-M)
 2. [ESP32-C3-DevKitC-02](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/hw-reference/esp32c3/user-guide-devkitc-02.html)
 
-PAISA on the IoT side is working on the NXP board. To support the WiFi interface, the board is physically connected with the WiFi module, the ESP board.
+
 
 <p align="center">
   <img src="./4_Others/board_config.jpg" width=70%, alt="PAISA IoT board configuration">
 </p>
 <p align = "center">
-<b>Figure 1 - PAISA hardware connection between NXP board and ESP board</b>
+<b>Figure 1 -  hardware connection between NXP board and ESP board</b>
 </p>
 
 The NXP board (big) is wired with the ESP board (small). UART4 on the NXP board is connected to UART 1 on the ESP board. Each board is powered individually.
@@ -64,7 +63,7 @@ Environment (processor and OS) used for development emulating PAISA Manufacturer
 11th Gen Intel® Core™ i5-11400 @ 2.60GHz × 12, Ubuntu 22.04.2 LTS.
 
 #### User Device
-We used the below two Android phones for emulating PAISA user device.
+We used the below  for emulating  user device.
 1. [Google Pixel 6](https://store.google.com/intl/en/ideas/articles/google-pixel-6-features/), running on Android 12 (API Level: 32)
 2. [BLU View 1](https://store.google.com/intl/en/ideas/articles/google-pixel-6-features/), running on Android 9 (API Level: 28)
 
@@ -113,7 +112,7 @@ Android phones are used for the implementation.
 2. SDK: API 33 (Android 13.0, Tiramisu)
 
 
-## Building/running PAISA binaries on each device
+## Building/running  binaries on each device
 #### NXP Board
 The project for the NXP board is composed of two projects, freertos_blinky_ns for Normal world (non-secure) and freertos_blinky_s for Secure world. 
 To build binaries running on each world, click each project and click the button, build, in the following way:
@@ -157,7 +156,7 @@ Command Palette ('View'-'Command Palette', or just press ctrl+shift+p) is used f
 Make sure that the ESP board is powered from your laptop/desktop before going through the above steps.
 
 #### Manufacturer Server (<i>mfr</i>)
-To run <i>mfr</i> PAISA software, type the command as below:
+To run <i>mfr</i>  software, type the command as below:
 
         python3 2_ManufacturerServer/ttp_time_srv.py
 
@@ -171,17 +170,17 @@ Developer options should be enabled to download the app from Android Studio dire
 In Android Studio, the Android phone connected to your laptop/desktop appears to 'Device Manager' - 'Physical'. Then follows the next steps:
 1. Click the botton, located at top center, to choose your device to connect.
 2. Click the botton next to the botton in step 1 to run the code to the chosen device.
-3. After the app run on the phone, click 'SCAN PAISA DEVICE' button to start scanning the PAISA-enabled IoT devices.
+3. After the app run on the phone, click 'SCAN PAISA DEVICE' button to start scanning the -enabled IoT devices.
 4. If the app is executed first time after it is installed, it asks the location permission. The location permissions appeared on the phone can vary depending on Android version, but it is safe to choose 'Precise' location permission. (Relying on Android version, the pop up only shows 'Precise' permission)
 5. All results will appear as depicted in the below figures.
 
 
 <p align="center">
-  <img src="./4_Others/phone_permission.png" width=20%, alt="PAISA Android app to ask permissions" caption="hi">
-  <img src="./4_Others/phone_results.png" width=20%, alt="PAISA Android app to show the results">
+  <img src="./4_Others/phone_permission.png" width=20%, alt=" Android app to ask permissions" caption="hi">
+  <img src="./4_Others/phone_results.png" width=20%, alt=" Android app to show the results">
 </p>
 <p align = "center">
-<b>Figure 2 - PAISA Android app</b>
+<b>Figure 2 -  Android app</b>
 </p>
 
 
