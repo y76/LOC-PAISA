@@ -3,23 +3,6 @@
  * Companion code for DB-PAISA project
  */
 
-/*
-
-Next steps.
-- [ ] Add LOC-PAISA to announcement on IoT Side
-- [ ] on user side LOOK for LOC-PAISA in message
-- [ ] Generate STS key
-- [ ] Send STS information UWB BOARD -> UART -> Start ranging
-- [ ] Encrypt sts key
-- [ ] bluetooth broadcast BACK to the other way
-- [ ] receive message on IoT side
-- [ ] send message to NXP board
-- [ ] Decrypt on NXP board
-- [ ] send via UART STS key to UWB Board -> Start Ranging
-- [ ] Stop ranging
-
-*/
-
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nimble/nimble_port.h"
@@ -77,7 +60,7 @@ struct __attribute__((packed)) ble_gap_disc_desc_debug
     uint8_t phy_secondary;
     uint32_t extended_flags;
     uint16_t more_flags;
-    uint8_t *data; // This should be a pointer
+    uint8_t *data; 
 };
 
 typedef struct
@@ -113,14 +96,13 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg);
 static uint8_t own_addr_type;
 #define BUF_SIZE (155)
 #define UART_BUF_SIZE (255)
-#define MBUF_DATA_SIZE 260 // Maximum advertising data length is 255 bytes
+#define MBUF_DATA_SIZE 260 
 #define ECHO_UART_PORT_NUM (1)
 #define ECHO_TEST_TXD (6)
 #define ECHO_TEST_RXD (7)
 #define ECHO_TEST_RTS (-1)
 #define ECHO_TEST_CTS (-1)
 #define ECHO_UART_BAUD_RATE (115200)
-// Declare the mbuf pool variables
 struct os_mbuf_pool large_mbuf_pool;
 struct os_mempool large_mbuf_mempool;
 uint8_t large_mbuf_buffer[OS_MEMPOOL_BYTES(10, MBUF_DATA_SIZE)];
@@ -135,18 +117,15 @@ static uint8_t global_signature[256];
 static size_t global_signature_len;
 static uint32_t global_device_id = 0;
 
-#define CERT_BUFFER_SIZE 2048 // Adjust if needed
+#define CERT_BUFFER_SIZE 2048 
 #define PUBKEY_BUFFER_SIZE 1024
 
 static char certificate_of_manufacturer[CERT_BUFFER_SIZE] = {0};
 static char public_key_manufacturer[PUBKEY_BUFFER_SIZE] = {0};
 static void IRAM_ATTR uart_rx_isr_handler(void *arg);
 
-// UART initialization function
 void uart_init(void)
 {
-    /* Configure parameters of an UART driver,
-     * communication pins and install the driver */
     uart_config_t uart_config = {
         .baud_rate = ECHO_UART_BAUD_RATE,
         .data_bits = UART_DATA_8_BITS,
@@ -178,17 +157,13 @@ static void uart_task(void *pvParameters)
     }
 
     while (1) {
-        // Wait for data to be received
         const int rxBytes = uart_read_bytes(ECHO_UART_PORT_NUM, data, BUF_SIZE, 20 / portTICK_PERIOD_MS);
         
         if (rxBytes > 0) {
-            // Null-terminate the data (for string operations if needed)
             data[rxBytes] = 0;
             
-            // Log received data
             ESP_LOGI(TAG, "Received %d bytes from UART:", rxBytes);
-            
-            // Print as hex
+        
             printf("HEX: ");
             for (int i = 0; i < rxBytes; i++) {
                 printf("%02X ", data[i]);
@@ -198,7 +173,6 @@ static void uart_task(void *pvParameters)
             }
             printf("\n");
             
-            // Print as ASCII (where printable)
             printf("ASCII: ");
             for (int i = 0; i < rxBytes; i++) {
                 if (data[i] >= 32 && data[i] <= 126) {
@@ -209,23 +183,12 @@ static void uart_task(void *pvParameters)
             }
             printf("\n");
             
-            // Process received data based on content or protocol
-            // Check for specific end markers or commands
-            
-            // Example: Check for a specific end marker
             if (rxBytes > 6 && memcmp(&data[rxBytes - 6], "MSGEND", 6) == 0) {
-                ESP_LOGI(TAG, "Received message with MSGEND marker");
-                // Process message
-                
-                // Example response
+                ESP_LOGI(TAG, "Received message with MSGEND marker");               
                 uint8_t response[] = "ACK: Message received";
-            //    send_uart_data(response, sizeof(response) - 1); // -1 to exclude null terminator
             } 
-            // Add other protocol-specific handlers here
         }
     }
-    
-    // This code is never reached but good practice
     free(data);
     vTaskDelete(NULL);
 }
@@ -240,25 +203,20 @@ static void send_uart_data(const uint8_t *data, uint8_t data_len)
     char *buf = (char *)malloc(UART_BUF_SIZE);
     memset(buf, 0, UART_BUF_SIZE);
 
-    // Build complete message: START_MARKER + DATA + END_MARKER
     size_t pos = 0;
 
-    // Copy start marker
     memcpy(buf, start_marker, start_marker_len);
     pos += start_marker_len;
 
-    // Copy data if present
     if (data && data_len > 0)
     {
         memcpy(buf + pos, data, data_len);
         pos += data_len;
     }
 
-    // Copy end marker
     memcpy(buf + pos, end_marker, end_marker_len);
     pos += end_marker_len;
 
-    // Print complete message before sending
     printf("Sending message (hex): ");
     for (size_t i = 0; i < pos; i++)
     {
@@ -281,16 +239,14 @@ void init_large_mbuf_pool(void)
 {
     int rc;
 
-    // Initialize the memory pool for mbufs
     rc = os_mempool_init(
         &large_mbuf_mempool,
-        10, // Number of mbufs in the pool
+        10,
         MBUF_DATA_SIZE,
         large_mbuf_buffer,
         "large_mbuf_mempool");
     assert(rc == 0);
 
-    // Initialize the mbuf pool with the memory pool
     rc = os_mbuf_pool_init(
         &large_mbuf_pool,
         &large_mbuf_mempool,
@@ -305,17 +261,14 @@ static void ext_adv_init(void)
     struct ble_gap_ext_adv_params params;
     int rc;
 
-    /* Check if instance is already active */
     if (ble_gap_ext_adv_active(INSTANCE_ID))
     {
         rc = ble_gap_ext_adv_stop(INSTANCE_ID);
         assert(rc == 0);
     }
 
-    /* Set default parameters */
     memset(&params, 0, sizeof(params));
 
-    /* Set advertising parameters */
     params.connectable = 0;
     params.scannable = 0;
     params.legacy_pdu = 0;
@@ -337,7 +290,6 @@ static void send_ble_message(uint8_t *data, size_t data_len)
     size_t prefix_len = strlen(prefix);
     size_t total_data_len = prefix_len + data_len;
 
-    // Calculate total advertisement length
     uint8_t total_adv_length = 3 + 2 + 2 + total_data_len; // Flags + header + company ID + prefix + data
 
     uint8_t *adv_data = malloc(total_adv_length);
@@ -347,18 +299,15 @@ static void send_ble_message(uint8_t *data, size_t data_len)
         return;
     }
 
-    // Standard flags
     adv_data[0] = 0x02;
     adv_data[1] = 0x01;
     adv_data[2] = 0x06;
 
-    // Manufacturer specific data
     adv_data[3] = total_data_len + 3;
     adv_data[4] = 0xFF;
     adv_data[5] = 0xE5;
     adv_data[6] = 0x02;
 
-    // Add prefix and payload data
     memcpy(&adv_data[7], prefix, prefix_len);
     memcpy(&adv_data[7 + prefix_len], data, data_len);
 
@@ -371,7 +320,6 @@ static void send_ble_message(uint8_t *data, size_t data_len)
     }
     printf("\n");
 
-    // Rest of function same as before
     struct os_mbuf *mbuf;
     int rc;
 
@@ -424,8 +372,7 @@ static void send_loc_resp(void)
     int rc;
     const char *loc_resp = "LOC-RESP";
 
-    // Calculate total advertisement length
-    uint8_t total_adv_length = 3 + 2 + 2 + strlen(loc_resp); // Flags + header + company ID + LOC-RESP
+    uint8_t total_adv_length = 3 + 2 + 2 + strlen(loc_resp); 
 
     uint8_t *adv_data = malloc(total_adv_length);
     if (adv_data == NULL)
@@ -434,21 +381,18 @@ static void send_loc_resp(void)
         return;
     }
 
-    // Standard flags
-    adv_data[0] = 0x02; // Length of flags field
-    adv_data[1] = 0x01; // Flags data type
-    adv_data[2] = 0x06; // Flags value
+    adv_data[0] = 0x02; 
+    adv_data[1] = 0x01; 
+    adv_data[2] = 0x06; 
 
-    // Manufacturer specific data
-    adv_data[3] = strlen(loc_resp) + 3; // Length of mfg specific data
-    adv_data[4] = 0xFF;                 // Manufacturer specific data type
-    adv_data[5] = 0xE5;                 // Company ID (LSB)
-    adv_data[6] = 0x02;                 // Company ID (MSB)
+    adv_data[3] = strlen(loc_resp) + 3; 
+    adv_data[4] = 0xFF;                
+    adv_data[5] = 0xE5;                
+    adv_data[6] = 0x02;                 
 
     // Add LOC-RESP
     memcpy(&adv_data[7], loc_resp, strlen(loc_resp));
 
-    // Stop any ongoing advertising
     if (ble_gap_ext_adv_active(INSTANCE_ID))
     {
         rc = ble_gap_ext_adv_stop(INSTANCE_ID);
@@ -479,7 +423,6 @@ static void send_loc_resp(void)
         return;
     }
 
-    // Start advertising for a limited time (e.g., 1000ms)
     rc = ble_gap_ext_adv_start(INSTANCE_ID, 100, 0);
     if (rc != 0)
     {
@@ -496,10 +439,7 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
 {
     ESP_LOGI(TAG, "\n=== Message Components Breakdown ===");
 
-    // Start from beginning for n_dev
-    int offset = 7 + 9; // Skip BLE header and LOC-PAISA
-
-    // n_dev (32 bytes)
+    int offset = 7 + 9; 
     ESP_LOGI(TAG, "n_dev (32 bytes): ");
     for (int i = 0; i < 32; i++)
     {
@@ -509,7 +449,6 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
     printf("\n");
     offset += 32;
 
-    // curTS (4 bytes)
     uint32_t curTs = data[offset] | (data[offset + 1] << 8) |
                      (data[offset + 2] << 16) | (data[offset + 3] << 24);
     global_timestamp = curTs;
@@ -518,7 +457,6 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
              (unsigned long)curTs);
     offset += 4;
 
-    // Calculate signature length and print with actual size
     int sig_start = offset;
     int sig_end = length - 6 - data[length - 6];
     int sig_len = sig_end - sig_start;
@@ -531,7 +469,6 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
     global_signature_len = sig_len;
     printf("\n");
 
-    // Print URL
     uint8_t url_len = data[length - 6];
     global_url_len = url_len;
     ESP_LOGI(TAG, "M_SRV_URL (%d bytes): ", url_len);
@@ -543,14 +480,11 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
     global_url[url_len] = '\0';
     printf("\n");
 
-    // url_len
     ESP_LOGI(TAG, "m_srv_url_len (1 byte): %02X (Decimal: %u)", url_len, url_len);
 
-    // attest_result
     global_attest_result = data[length - 5];
     ESP_LOGI(TAG, "attest_result (1 byte): %02X", global_attest_result);
 
-    // time_attest
     uint32_t time_attest = data[length - 4] | (data[length - 3] << 8) |
                            (data[length - 2] << 16) | (data[length - 1] << 24);
     global_time_attest = time_attest;
@@ -558,156 +492,7 @@ static void print_adv_data(const uint8_t *data, uint16_t length)
              data[length - 4], data[length - 3], data[length - 2], data[length - 1],
              (unsigned long)time_attest);
 
-    // Rest of the existing print_adv_data function...
 }
-
-/*
-static void print_adv_data(const uint8_t *data, uint16_t length)
-{
-    ESP_LOGI(TAG, "\n=== Message Components Breakdown ===");
-
-    // Start from beginning for n_dev
-    int offset = 7 + 9; // Skip BLE header and LOC-PAISA
-
-    // n_dev (32 bytes)
-    ESP_LOGI(TAG, "n_dev (32 bytes): ");
-    for (int i = 0; i < 32; i++)
-    {
-        printf("%02X ", data[offset + i]);
-        saved_n_dev[i] = data[offset + i];
-    }
-    printf("\n");
-    offset += 32;
-
-    // curTS (4 bytes)
-    uint32_t curTs = data[offset] | (data[offset + 1] << 8) |
-                     (data[offset + 2] << 16) | (data[offset + 3] << 24);
-    ESP_LOGI(TAG, "curTS (4 bytes): %02X %02X %02X %02X (Decimal: %lu)",
-             data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-             (unsigned long)curTs);
-
-    // if (curTs <= cur_timestamp)
-    // {
-    //    ESP_LOGI(TAG, "Timestamp not valid. Received: %lu, Current: %lu",
-    //             (unsigned long)curTs,
-    //             (unsigned long)cur_timestamp);
-    //    return;
-    // }
-
-    // Update global timestamp
-    // cur_timestamp = curTs;
-    offset += 4;
-
-    // Calculate signature length and print with actual size
-    int sig_start = offset;
-    int sig_end = length - 6 - data[length - 6];
-    int sig_len = sig_end - sig_start;
-    ESP_LOGI(TAG, "signature (%d bytes): ", sig_len);
-    for (int i = sig_start; i < sig_end; i++)
-    {
-        printf("%02X ", data[i]);
-    }
-    printf("\n");
-
-    // Print URL
-    uint8_t url_len = data[length - 6];
-    ESP_LOGI(TAG, "M_SRV_URL (%d bytes): ", url_len);
-    for (int i = 0; i < url_len; i++)
-    {
-        printf("%c", data[length - 6 - url_len + i]);
-    }
-    printf("\n");
-
-    // url_len
-    ESP_LOGI(TAG, "m_srv_url_len (1 byte): %02X (Decimal: %u)", url_len, url_len);
-
-    // attest_result
-    ESP_LOGI(TAG, "attest_result (1 byte): %02X", data[length - 5]);
-
-    // time_attest
-    uint32_t time_attest = data[length - 4] | (data[length - 3] << 8) |
-                           (data[length - 2] << 16) | (data[length - 1] << 24);
-    ESP_LOGI(TAG, "time_attest (4 bytes): %02X %02X %02X %02X (Decimal: %lu)",
-             data[length - 4], data[length - 3], data[length - 2], data[length - 1],
-             (unsigned long)time_attest);
-
-    ESP_LOGI(TAG, "\n=== Signature Components Breakdown ===");
-    ESP_LOGI(TAG, "The signature was generated over:");
-    ESP_LOGI(TAG, "- n_dev (32 bytes)");
-    ESP_LOGI(TAG, "- time_cur (4 bytes)");
-    ESP_LOGI(TAG, "- id_dev (4 bytes): %lu", 19682938UL);
-    ESP_LOGI(TAG, "- H(M_SRV_URL) (32 bytes)");
-    ESP_LOGI(TAG, "- attest_result (1 byte)");
-    ESP_LOGI(TAG, "- time_attest (4 bytes)");
-
-    // Print complete raw message
-    ESP_LOGI(TAG, "\n=== Complete Raw Message ===");
-    ESP_LOGI(TAG, "Full message (length %d): ", length);
-    for (int i = 0; i < length; i++)
-    {
-        printf("%02X ", data[i]);
-        if ((i + 1) % 16 == 0)
-            printf("\n");
-    }
-    printf("\n");
-}*/
-/*
-// Function to print advertisement data in a readable format
-static void print_adv_data(const uint8_t *data, uint16_t length)
-{
-    ESP_LOGI(TAG, "Advertisement data (length %d):", length);
-
-    // Print entire raw data first
-    ESP_LOGI(TAG, "Full raw data:");
-    for (int i = 0; i < length; i++)
-    {
-        printf("%02X ", data[i]);
-        if ((i + 1) % 16 == 0)
-            printf("\n");
-    }
-    printf("\n");
-
-    // Now we know it's structured as:
-    // [02 01 06] [XX FF Company_ID Data...]
-    if (length >= 3 && data[0] == 0x02 && data[1] == 0x01)
-    {
-        ESP_LOGI(TAG, "Flags field: %02X", data[2]);
-    }
-
-    // Find manufacturer data (should start at index 3)
-    if (length > 4 && data[4] == 0xFF)
-    {
-        uint16_t company_id = data[5] | (data[6] << 8);
-        ESP_LOGI(TAG, "Manufacturer Data:");
-        ESP_LOGI(TAG, "  Company ID: 0x%04X", company_id);
-        ESP_LOGI(TAG, "  Data (%d bytes):", length - 7);
-
-        // Print manufacturer data in hex
-        for (int i = 7; i < length; i++)
-        {
-            printf("%02X ", data[i]);
-            if ((i - 6) % 16 == 0)
-                printf("\n");
-        }
-        printf("\n");
-
-        // Try ASCII interpretation
-        ESP_LOGI(TAG, "ASCII interpretation:");
-        for (int i = 7; i < length; i++)
-        {
-            if (isprint(data[i]))
-            {
-                printf("%c", data[i]);
-            }
-            else
-            {
-                printf(".");
-            }
-        }
-        printf("\n");
-    }
-}*/
-
 static void ble_scanner_init(void)
 {
     int rc;
@@ -722,14 +507,13 @@ static void ble_scanner_init(void)
     struct ble_gap_disc_params scan_params = {
         .itvl = BLE_GAP_SCAN_ITVL_MS(100),
         .window = BLE_GAP_SCAN_WIN_MS(50),
-        .filter_duplicates = 0, // Don't filter duplicates
-        .limited = 0,           // Don't limit discovery
-        .passive = 0,           // Use active scanning
-        .filter_policy = 0      // No filtering
+        .filter_duplicates = 0, 
+        .limited = 0,           
+        .passive = 0,          
+        .filter_policy = 0      
     };
 
-    // Start regular scanning instead of extended
-    rc = ble_gap_disc(own_addr_type, 0, // Duration (0 = scan continuously)
+    rc = ble_gap_disc(own_addr_type, 0, 
                       &scan_params,
                       ble_gap_event, NULL);
 
@@ -749,14 +533,11 @@ static bool contains_loc_paisa(const uint8_t *data)
     const size_t marker_len = strlen(loc_paisa);
     uint8_t total_length = data[3];
 
-    // Need at least 7 bytes for header plus enough space for the marker
     if (total_length < 7 + marker_len)
     {
         return false;
     }
 
-    // Check if the data after manufacturer specific data contains our marker
-    // Start checking from position 7 (after flags and manufacturer data header)
     for (size_t i = 7; i <= total_length - marker_len; i++)
     {
         if (memcmp(&data[i], loc_paisa, marker_len) == 0)
@@ -834,8 +615,6 @@ void wifi_init_sta(void)
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() */
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
                                            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
                                            pdFALSE,
@@ -858,7 +637,6 @@ void wifi_init_sta(void)
     }
 }
 
-// Add this global buffer to store the complete response
 static char response_buffer[4096];
 static int response_len = 0;
 
@@ -867,7 +645,6 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
     switch (evt->event_id)
     {
     case HTTP_EVENT_ON_HEADER:
-        // Reset buffer at the start of a new request
         if (evt->header_key != NULL)
         {
             response_len = 0;
@@ -876,17 +653,15 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
         break;
 
     case HTTP_EVENT_ON_DATA:
-        // Prevent buffer overflow and duplicates
         if (response_len + evt->data_len < sizeof(response_buffer))
         {
             memcpy(response_buffer + response_len, evt->data, evt->data_len);
             response_len += evt->data_len;
-            response_buffer[response_len] = 0; // Null terminate
+            response_buffer[response_len] = 0;
         }
         break;
 
     case HTTP_EVENT_ON_FINISH:
-        // Ensure buffer is null-terminated
         if (response_len < sizeof(response_buffer))
         {
             response_buffer[response_len] = 0;
@@ -894,7 +669,6 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
         break;
 
     case HTTP_EVENT_ERROR:
-        // Clear buffer on error
         response_len = 0;
         memset(response_buffer, 0, sizeof(response_buffer));
         break;
@@ -906,7 +680,6 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 }
 
 static char certificate_of_device[CERT_BUFFER_SIZE] = {0};
-// Buffer to store the extracted public key
 static char public_key[PUBKEY_BUFFER_SIZE] = {0};
 
 void fix_certificate_format(const char *src_cert, char *fixed_cert, size_t fixed_cert_size)
@@ -918,16 +691,16 @@ void fix_certificate_format(const char *src_cert, char *fixed_cert, size_t fixed
     {
         if (*src == '\\' && *(src + 1) == 'n')
         {
-            if (dst - fixed_cert < fixed_cert_size - 1) // Make sure we don't overflow the buffer
+            if (dst - fixed_cert < fixed_cert_size - 1) 
             {
-                *dst = '\n'; // Replace "\n" with actual newline
+                *dst = '\n'; 
                 dst++;
             }
-            src += 2; // Skip over the escaped characters
+            src += 2; 
         }
         else
         {
-            if (dst - fixed_cert < fixed_cert_size - 1) // Prevent buffer overflow
+            if (dst - fixed_cert < fixed_cert_size - 1) 
             {
                 *dst = *src;
                 dst++;
@@ -936,10 +709,10 @@ void fix_certificate_format(const char *src_cert, char *fixed_cert, size_t fixed
         }
     }
 
-    *dst = '\0'; // Ensure null termination
+    *dst = '\0'; 
 }
 
-#define CERT_SIZE 2048 // Make sure this size is sufficient for your certificate
+#define CERT_SIZE 2048 
 
 void extract_public_key_from_cert(const char *certificate, char *output_key, size_t output_size, const char *key_owner)
 {
@@ -949,14 +722,12 @@ void extract_public_key_from_cert(const char *certificate, char *output_key, siz
         return;
     }
 
-    // Fix certificate format
     char fixed_cert[CERT_SIZE];
     fix_certificate_format(certificate, fixed_cert, CERT_SIZE);
 
     mbedtls_x509_crt cert;
     mbedtls_x509_crt_init(&cert);
 
-    // Parse the certificate from the PEM string
     int ret = mbedtls_x509_crt_parse(&cert, (const unsigned char *)fixed_cert, strlen(fixed_cert) + 1);
     if (ret != 0)
     {
@@ -965,10 +736,8 @@ void extract_public_key_from_cert(const char *certificate, char *output_key, siz
         return;
     }
 
-    // Extract the public key
     mbedtls_pk_context *pk = &cert.pk;
 
-    // Check if it's an EC key
     if (!mbedtls_pk_can_do(pk, MBEDTLS_PK_ECKEY))
     {
         ESP_LOGE(TAG, "%s certificate does not contain an EC public key!", key_owner);
@@ -976,7 +745,6 @@ void extract_public_key_from_cert(const char *certificate, char *output_key, siz
         return;
     }
 
-    // Convert the public key to PEM format
     unsigned char buf[PUBKEY_BUFFER_SIZE];
     size_t olen = 0;
     ret = mbedtls_pk_write_pubkey_pem(pk, buf, PUBKEY_BUFFER_SIZE);
@@ -987,26 +755,20 @@ void extract_public_key_from_cert(const char *certificate, char *output_key, siz
         return;
     }
 
-    // Copy the public key to the output buffer
     strncpy(output_key, (const char *)buf, output_size - 1);
     output_key[output_size - 1] = '\0';
 
     ESP_LOGI(TAG, "Extracted %s EC Public Key:\n%s", key_owner, output_key);
 
-    // Clean up
     mbedtls_x509_crt_free(&cert);
 }
 
-// Modified version of the original extract_public_key function
 void extract_public_keys(void)
 {
-    // Extract device public key
     extract_public_key_from_cert(certificate_of_device, public_key, PUBKEY_BUFFER_SIZE, "device");
 
-    // Extract manufacturer public key
     extract_public_key_from_cert(certificate_of_manufacturer, public_key_manufacturer, PUBKEY_BUFFER_SIZE, "manufacturer");
 
-    // Additional debug logging
     ESP_LOGI(TAG, "\n=== Public Keys Extraction Complete ===");
     ESP_LOGI(TAG, "Device Public Key Status: %s", strlen(public_key) > 0 ? "Extracted" : "Failed");
     ESP_LOGI(TAG, "Manufacturer Public Key Status: %s", strlen(public_key_manufacturer) > 0 ? "Extracted" : "Failed");
@@ -1020,14 +782,12 @@ void extract_public_key()
         return;
     }
 
-    // Fix certificate format (if necessary)
     char fixed_cert[CERT_SIZE];
     fix_certificate_format(certificate_of_device, fixed_cert, CERT_SIZE);
 
     mbedtls_x509_crt cert;
     mbedtls_x509_crt_init(&cert);
 
-    // Parse the certificate from the PEM string
     int ret = mbedtls_x509_crt_parse(&cert, (const unsigned char *)fixed_cert, strlen(fixed_cert) + 1);
     if (ret != 0)
     {
@@ -1036,10 +796,8 @@ void extract_public_key()
         return;
     }
 
-    // Extract the public key
     mbedtls_pk_context *pk = &cert.pk;
 
-    // Check if it's an RSA key instead of EC
     if (!mbedtls_pk_can_do(pk, MBEDTLS_PK_ECKEY))
     {
         ESP_LOGE(TAG, "Certificate does not contain an EC public key!");
@@ -1047,8 +805,7 @@ void extract_public_key()
         return;
     }
 
-    // Convert the public key to PEM format
-    unsigned char buf[PUBKEY_BUFFER_SIZE]; // Ensure this is large enough
+    unsigned char buf[PUBKEY_BUFFER_SIZE];
     size_t olen = 0;
     ret = mbedtls_pk_write_pubkey_pem(pk, buf, PUBKEY_BUFFER_SIZE);
     if (ret != 0)
@@ -1058,13 +815,11 @@ void extract_public_key()
         return;
     }
 
-    // Ensure the public key buffer is large enough and copy the public key to global buffer
     strncpy(public_key, (const char *)buf, PUBKEY_BUFFER_SIZE - 1);
-    public_key[PUBKEY_BUFFER_SIZE - 1] = '\0'; // Null terminate the string
+    public_key[PUBKEY_BUFFER_SIZE - 1] = '\0'; 
 
     ESP_LOGI(TAG, "Extracted EC Public Key:\n%s", public_key);
 
-    // Clean up
     mbedtls_x509_crt_free(&cert);
 }
 
@@ -1073,7 +828,7 @@ void display_paisa_info(const char *url)
     ESP_LOGI(TAG, "Device URL: %s", url);
 
     esp_http_client_config_t config = {
-        .host = "bit.ly",
+        .host = "bit.ly",   //hardcoded for testing, just pass in the extracted url
         .path = "/3EJadxK",
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .cert_pem = NULL,
@@ -1100,7 +855,6 @@ void display_paisa_info(const char *url)
         ESP_LOGI(TAG, "Actual Response Length: %d bytes", response_len);
         ESP_LOGI(TAG, "RAW MESSAGE: %.*s", response_len, response_buffer);
 
-        // Extract device_id
         const char *device_id_start = strstr(response_buffer, "device_id:");
         if (device_id_start != NULL)
         {
@@ -1108,13 +862,12 @@ void display_paisa_info(const char *url)
             char *device_id_end = strchr(device_id_start, '\n');
             if (device_id_end != NULL)
             {
-                char device_id_str[32] = {0}; // Buffer to hold the ID string
+                char device_id_str[32] = {0};
                 size_t id_len = device_id_end - device_id_start;
                 if (id_len < sizeof(device_id_str))
                 {
                     strncpy(device_id_str, device_id_start, id_len);
                     device_id_str[id_len] = '\0';
-                    // Convert string to integer
                     global_device_id = (uint32_t)strtoul(device_id_str, NULL, 10);
                     ESP_LOGI(TAG, "Device ID extracted: %lu", (unsigned long)global_device_id);
                 }
@@ -1133,7 +886,6 @@ void display_paisa_info(const char *url)
             ESP_LOGE(TAG, "Device ID not found in response");
         }
 
-        // Extract certificate_of_device
         const char *cert_device_start = strstr(response_buffer, "certificate_of_device:");
         if (cert_device_start != NULL)
         {
@@ -1163,7 +915,6 @@ void display_paisa_info(const char *url)
             ESP_LOGE(TAG, "Certificate of device not found in response");
         }
 
-        // Extract certificate_of_manufacturer
         const char *cert_mfr_start = strstr(response_buffer, "certificate_of_manufacturer:");
         if (cert_mfr_start != NULL)
         {
@@ -1201,19 +952,16 @@ void display_paisa_info(const char *url)
     esp_http_client_cleanup(client);
 }
 
-// Helper function to extract URL from BLE announcement
 static void extract_and_display_url(const uint8_t *data, uint8_t length)
 {
     const char *https_marker = "https://";
     const size_t marker_len = strlen(https_marker);
     char url_buffer[100] = {0};
 
-    // Search for the start of HTTPS in the raw data
     for (int i = 0; i < length - marker_len; i++)
     {
         if (memcmp(&data[i], https_marker, marker_len) == 0)
         {
-            // Found the start of the URL, copy until the end of the data
             size_t remaining_length = length - i;
             size_t url_length = remaining_length < sizeof(url_buffer) ? remaining_length : sizeof(url_buffer) - 1;
             memcpy(url_buffer, &data[i], url_length);
@@ -1224,64 +972,6 @@ static void extract_and_display_url(const uint8_t *data, uint8_t length)
         }
     }
 }
-/*
-static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
-                                   const char *public_key,
-                                   uint8_t *encrypted_data, size_t *encrypted_len)
-{
-    mbedtls_pk_context pk;
-    mbedtls_entropy_context entropy;
-    mbedtls_ctr_drbg_context ctr_drbg;
-    const char *pers = "encrypt_with_public_key";
-    int ret = 0;
-
-    mbedtls_pk_init(&pk);
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-
-    do
-    {
-        ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
-                                    (const unsigned char *)pers, strlen(pers));
-        if (ret != 0)
-        {
-            ESP_LOGE(TAG, "Failed to seed CTR_DRBG: -0x%x", -ret);
-            break;
-        }
-
-        ESP_LOGI(TAG, "Parsing public key of length %d", strlen(public_key));
-        ret = mbedtls_pk_parse_public_key(&pk, (const unsigned char *)public_key, strlen(public_key) + 1);
-        if (ret != 0)
-        {
-            ESP_LOGE(TAG, "Failed to parse public key: -0x%x", -ret);
-            break;
-        }
-
-        ESP_LOGI(TAG, "Encrypting data of length %d", data_len);
-        ret = mbedtls_pk_encrypt(&pk, data, data_len,
-                                 encrypted_data, encrypted_len,
-                                 *encrypted_len,
-                                 mbedtls_ctr_drbg_random, &ctr_drbg);
-
-        if (ret != 0)
-        {
-            ESP_LOGE(TAG, "Failed to encrypt data: -0x%x", -ret);
-            char error_buf[100];
-            mbedtls_strerror(ret, error_buf, 100);
-            ESP_LOGE(TAG, "Error details: %s", error_buf);
-        }
-        else
-        {
-            ESP_LOGI(TAG, "Data encrypted successfully. Encrypted length: %d", *encrypted_len);
-        }
-    } while (0);
-
-    mbedtls_pk_free(&pk);
-    mbedtls_entropy_free(&entropy);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-
-    return ret;
-}*/
 #include "mbedtls/pk.h"
 #include "mbedtls/ecdh.h"
 #include "mbedtls/ctr_drbg.h"
@@ -1294,8 +984,8 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
 static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
                                    const char *public_key_pem,
                                    uint8_t *encrypted_data, size_t *encrypted_len,
-                                   uint8_t *out_ephemeral_public, // Add this
-                                   uint8_t *out_iv)               // Add this
+                                   uint8_t *out_ephemeral_public, 
+                                   uint8_t *out_iv)             
 {
     mbedtls_ecdh_context ctx;
     mbedtls_entropy_context entropy;
@@ -1303,20 +993,18 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
     mbedtls_pk_context peer_pk;
     const char *pers = "gen_key";
     int ret = 0;
-    uint8_t *decrypted = NULL; // Move declaration to top
+    uint8_t *decrypted = NULL; 
     uint8_t shared_secret[32];
     uint8_t iv[12] = {0};
     uint8_t tag[16];
 
     esp_fill_random(&iv, sizeof(iv));
 
-    // Init all contexts
     mbedtls_ecdh_init(&ctx);
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_pk_init(&peer_pk);
 
-    // Right after your context initializations, add:
     decrypted = (uint8_t *)malloc(data_len);
     if (decrypted == NULL)
     {
@@ -1325,7 +1013,6 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
         goto cleanup;
     }
 
-    // Seed RNG
     ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
                                 (const unsigned char *)pers, strlen(pers));
     if (ret != 0)
@@ -1334,7 +1021,6 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
         goto cleanup;
     }
 
-    // Load curve
     ret = mbedtls_ecdh_setup(&ctx, MBEDTLS_ECP_DP_SECP256R1);
     if (ret != 0)
     {
@@ -1342,7 +1028,6 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
         goto cleanup;
     }
 
-    // Generate our ephemeral keypair
     ret = mbedtls_ecdh_gen_public(&ctx.MBEDTLS_PRIVATE(grp),
                                   &ctx.MBEDTLS_PRIVATE(d),
                                   &ctx.MBEDTLS_PRIVATE(Q),
@@ -1353,7 +1038,6 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
         goto cleanup;
     }
 
-    // Parse peer's public key from PEM
     ret = mbedtls_pk_parse_public_key(&peer_pk, (const unsigned char *)public_key_pem,
                                       strlen(public_key_pem) + 1);
     if (ret != 0)
@@ -1362,7 +1046,6 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
         goto cleanup;
     }
 
-    // Extract peer's public point
     const mbedtls_ecp_keypair *peer_keypair = mbedtls_pk_ec(peer_pk);
     ret = mbedtls_ecdh_compute_shared(&ctx.MBEDTLS_PRIVATE(grp),
                                       &ctx.MBEDTLS_PRIVATE(z),
@@ -1375,8 +1058,6 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
         goto cleanup;
     }
 
-    // Use shared secret for AES-GCM encryption
-    // uint8_t shared_secret[32];
     size_t secret_len;
     ret = mbedtls_mpi_write_binary(&ctx.MBEDTLS_PRIVATE(z), shared_secret, sizeof(shared_secret));
     if (ret != 0)
@@ -1385,11 +1066,7 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
         goto cleanup;
     }
 
-    // Encrypt data using AES-GCM
     mbedtls_gcm_context gcm;
-    // uint8_t iv[12] = {0}; // In production, use random IV
-    // uint8_t tag[16];
-
     mbedtls_gcm_init(&gcm);
     ret = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, shared_secret, 256);
     if (ret != 0)
@@ -1408,9 +1085,8 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
         goto cleanup_gcm;
     }
 
-    // Copy tag after encrypted data
     memcpy(encrypted_data + data_len, tag, 16);
-    *encrypted_len = data_len + 16; // encrypted data + tag
+    *encrypted_len = data_len + 16;
 
     ESP_LOGI(TAG, "Encryption successful");
 
@@ -1422,12 +1098,10 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
                                          out_ephemeral_public,
                                          65);
 
-    // Diagnostic prints
     ESP_LOGI(TAG, "Ephemeral public key export:");
     ESP_LOGI(TAG, "Return code: -0x%x", -ret);
     ESP_LOGI(TAG, "Exported key length: %zu", public_key_len);
 
-    // Print the first few bytes of the exported key
     ESP_LOGI(TAG, "First 8 bytes of ephemeral public key:");
     for (int i = 0; i < 65; i++)
     {
@@ -1435,10 +1109,8 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
     }
     printf("\n");
 
-    // Copy the IV
     memcpy(out_iv, iv, 12);
 
-    // Print shared secret in hex
     ESP_LOGI(TAG, "Shared secret:");
     for (int i = 0; i < 32; i++)
     {
@@ -1446,7 +1118,6 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
     }
     printf("\n");
 
-    // Print encrypted data in hex
     ESP_LOGI(TAG, "Encrypted data + tag (%d bytes):", *encrypted_len);
     for (int i = 0; i < *encrypted_len; i++)
     {
@@ -1454,23 +1125,13 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
     }
     printf("\n");
 
-    // Separate the tag from encrypted data for decryption
-    // uint8_t *decrypted = (uint8_t*)malloc(data_len);
-    // if (decrypted == NULL) {
-    //    ESP_LOGE(TAG, "Failed to allocate decryption buffer");
-    //    ret = -1;
-    //     goto cleanup;
-    // }
-
-    // Extract tag from the end of encrypted data
     memcpy(tag, encrypted_data + data_len, 16);
 
-    // Decrypt using only the encrypted portion
     ret = mbedtls_gcm_auth_decrypt(&gcm, data_len,
                                    iv, sizeof(iv),
                                    NULL, 0,
                                    tag, 16,
-                                   encrypted_data, // Just the encrypted portion
+                                   encrypted_data, 
                                    decrypted);
 
     if (ret == 0)
@@ -1499,7 +1160,7 @@ cleanup_gcm:
     mbedtls_gcm_free(&gcm);
 cleanup:
     if (decrypted)
-        free(decrypted); // Add this line
+        free(decrypted); 
     mbedtls_ecdh_free(&ctx);
     mbedtls_entropy_free(&entropy);
     mbedtls_ctr_drbg_free(&ctr_drbg);
@@ -1509,15 +1170,13 @@ cleanup:
 
 static bool is_timestamp_valid(const uint8_t *data)
 {
-    // Adjust offset to find timestamp
-    int offset = 7 + 9 + 32; // Same offset as before
+    int offset = 7 + 9 + 32; 
 
     uint32_t curTs = data[offset] |
                      (data[offset + 1] << 8) |
                      (data[offset + 2] << 16) |
                      (data[offset + 3] << 24);
 
-    // Compare timestamp
     if (curTs <= cur_timestamp)
     {
         ESP_LOGI(TAG, "Timestamp not valid. Received: %lu, Current: %lu",
@@ -1526,14 +1185,12 @@ static bool is_timestamp_valid(const uint8_t *data)
         return false;
     }
 
-    // Update global timestamp
     cur_timestamp = curTs;
     return true;
 }
 
 static bool verify_msganno_signature(const uint8_t *data, uint16_t length)
 {
-    // Hash the URL
     uint8_t url_hash[32];
     mbedtls_sha256_context sha256;
     mbedtls_sha256_init(&sha256);
@@ -1541,42 +1198,33 @@ static bool verify_msganno_signature(const uint8_t *data, uint16_t length)
     mbedtls_sha256_update(&sha256, global_url, global_url_len);
     mbedtls_sha256_finish(&sha256, url_hash);
 
-    // Reconstruct signed message components
     uint8_t signed_data[256];
     size_t signed_data_len = 0;
 
-    // n_dev (32 bytes)
     memcpy(signed_data, global_n_dev, 32);
     signed_data_len += 32;
 
-    // timestamp (4 bytes)
     memcpy(signed_data + signed_data_len, &global_timestamp, 4);
     signed_data_len += 4;
 
-    // id_dev (4 bytes) - now using the extracted global value
     memcpy(signed_data + signed_data_len, &global_device_id, 4);
     signed_data_len += 4;
 
-    // URL hash (32 bytes)
     memcpy(signed_data + signed_data_len, url_hash, 32);
     signed_data_len += 32;
 
-    // attest_result (1 byte)
     memcpy(signed_data + signed_data_len, &global_attest_result, 1);
     signed_data_len += 1;
 
-    // time_attest (4 bytes)
     memcpy(signed_data + signed_data_len, &global_time_attest, 4);
     signed_data_len += 4;
 
-    // Hash the reconstructed signed data
     uint8_t digest[32];
     mbedtls_sha256_init(&sha256);
     mbedtls_sha256_starts(&sha256, 0);
     mbedtls_sha256_update(&sha256, signed_data, signed_data_len);
     mbedtls_sha256_finish(&sha256, digest);
 
-    // Prepare public key context
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
 
@@ -1589,7 +1237,6 @@ static bool verify_msganno_signature(const uint8_t *data, uint16_t length)
         return false;
     }
 
-    // Verify the signature
     ret = mbedtls_pk_verify(&pk, MBEDTLS_MD_SHA256,
                             digest, sizeof(digest),
                             global_signature, global_signature_len);
@@ -1609,17 +1256,14 @@ static bool verify_msganno_signature(const uint8_t *data, uint16_t length)
 }
 
 static bool verify_manifest_signature(void) {
-    // Find where signature starts
     const char *sig_start = strstr(response_buffer, "signature_of_manifest:");
     if (!sig_start) {
         ESP_LOGE(TAG, "No signature found in manifest");
         return false;
     }
 
-    // Calculate content length (everything before signature_of_manifest)
     size_t content_len = sig_start - response_buffer;
 
-    // Calculate hash of content
     uint8_t digest[32];
     mbedtls_sha256_context sha256;
     mbedtls_sha256_init(&sha256);
@@ -1631,12 +1275,10 @@ static bool verify_manifest_signature(void) {
     ESP_LOGI(TAG, "Content being hashed (ASCII):");
     for(size_t i = 0; i < content_len; i++) {
         if(response_buffer[i] >= 32 && response_buffer[i] <= 126) {
-            // Printable character
             printf("%c", response_buffer[i]);
         } else if(response_buffer[i] == '\n') {
             printf("\n");
         } else {
-            // Non-printable character
             printf(".");
         }
     }
@@ -1655,7 +1297,6 @@ static bool verify_manifest_signature(void) {
     }
     printf("\n");
 
-    // Extract signature
     sig_start += strlen("signature_of_manifest:");
     const char *sig_end = strchr(sig_start, '\n');
     if (!sig_end) {
@@ -1663,14 +1304,13 @@ static bool verify_manifest_signature(void) {
         return false;
     }
 
-    // Clean up signature by removing newline sequences
     size_t sig_b64_len = sig_end - sig_start;
     char *clean_sig = malloc(sig_b64_len + 1);
     size_t clean_pos = 0;
 
     for(size_t i = 0; i < sig_b64_len; i++) {
         if(sig_start[i] == '\\' && i + 1 < sig_b64_len && sig_start[i + 1] == 'n') {
-            i++; // Skip both \ and n
+            i++; 
         } else {
             clean_sig[clean_pos++] = sig_start[i];
         }
@@ -1680,8 +1320,7 @@ static bool verify_manifest_signature(void) {
     ESP_LOGI(TAG, "Raw signature with newlines: %s", sig_start);
     ESP_LOGI(TAG, "Cleaned signature for base64: %s", clean_sig);
 
-    // Decode base64 signature
-    unsigned char *decoded_sig = malloc(clean_pos);  // Use clean_pos instead of sig_b64_len
+    unsigned char *decoded_sig = malloc(clean_pos); 
     size_t decoded_len;
     
     int ret = mbedtls_base64_decode(decoded_sig, clean_pos, &decoded_len,
@@ -1701,7 +1340,6 @@ static bool verify_manifest_signature(void) {
     }
     printf("\n");
 
-    // Initialize key verification
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
     
@@ -1717,7 +1355,6 @@ static bool verify_manifest_signature(void) {
         return false;
     }
 
-    // Verify signature
     ret = mbedtls_pk_verify(&pk, MBEDTLS_MD_SHA256,
                            digest, sizeof(digest),
                            decoded_sig, decoded_len);
@@ -1741,10 +1378,9 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
         if (debug_disc->data != NULL && debug_disc->data[4] == 0xFF && contains_loc_paisa(debug_disc->data))
         {
 
-            // CHECK TIMESTAMP FRESHNESS
             if (!is_timestamp_valid(debug_disc->data))
             {
-                return 0; // Exit the event handler
+                return 0;
             }
 
             ESP_LOGI(TAG, "Found LOC-PAISA advertisement");
@@ -1753,28 +1389,17 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
             ESP_LOGI(TAG, "Processing advertisement with length: %d", total_length);
             print_adv_data(debug_disc->data, total_length + 4);
 
-            // Log the sender's address
             char addr_str[18];
             snprintf(addr_str, sizeof(addr_str), "%02x:%02x:%02x:%02x:%02x:%02x",
                      disc->addr.val[5], disc->addr.val[4], disc->addr.val[3],
                      disc->addr.val[2], disc->addr.val[1], disc->addr.val[0]);
             ESP_LOGI(TAG, "Sender address: %s", addr_str);
 
-            // TODO
-            // VERIFY MANIFEST IDEV SIGNATURE USIGN PKMSR
-
-            // TODO
-            // VERIFY MSGANNO SIGNATURE USING PKIDEV
-
-            // PRINT OUT PAISA INFORMATION
             extract_and_display_url(debug_disc->data, total_length);
-            // PRINT out the manifest + the announcement information (neatly)
             if (strlen(certificate_of_device) > 0 && strlen(certificate_of_manufacturer) > 0)
             {
-                // extract_public_key();
                 extract_public_keys();
 
-                // First verify the manifest signature
                 if (!verify_manifest_signature())
                 {
                     ESP_LOGE(TAG, "Manifest signature verification failed");
@@ -1782,7 +1407,6 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 }
                 ESP_LOGI(TAG, "Manifest signature verified successfully");
 
-                // Then verify the message announcement signature
                 if (!verify_msganno_signature(debug_disc->data, total_length))
                 {
                     ESP_LOGE(TAG, "Message announcement signature verification failed");
@@ -1790,16 +1414,10 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 }
                 ESP_LOGI(TAG, "Message announcement signature verified successfully");
 
-                // Temporarily stop scanning while we send our response
                 ble_gap_disc_cancel();
 
-                // Generate STS Key
                 sts_key_t sts_key;
                 sts_iv_t sts_iv;
-
-                // Generate random values for key and IV using ESP32's hardware RNG
-                // esp_fill_random(&sts_key, sizeof(sts_key));
-                // esp_fill_random(&sts_iv, sizeof(sts_iv));
 
                 // for now, use generic hardcoded values for development
                 const char *key_string = "HELLOP@ISA2024"; // 13 chars
@@ -1836,16 +1454,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                          aes_key.key0, aes_key.key1, aes_key.key2, aes_key.key3,
                          aes_key.key4, aes_key.key5, aes_key.key6, aes_key.key7);
 
-                // Send Announcement data over to UWB board.
-                // send_uart_data(debug_disc->data, total_length);
-
-                // Create and send STS and AES data over UART
-                // uint8_t crypto_data[64]; // Increased to hold both STS and AES data
-                // memcpy(crypto_data, &sts_key, sizeof(sts_key));
-                // memcpy(crypto_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
-                // memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &aes_key, sizeof(aes_key));
-                // send_uart_data(crypto_data, sizeof(crypto_data));
-
+             
                 uint8_t crypto_data[36]; // 16 (STS key) + 16 (STS IV) + 2 (src_addr) + 2 (dst_addr)
                 memcpy(crypto_data, &sts_key, sizeof(sts_key));
                 memcpy(crypto_data + sizeof(sts_key), &sts_iv, sizeof(sts_iv));
@@ -1853,25 +1462,13 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv) + sizeof(src_addr), &dst_addr, sizeof(dst_addr));
                 send_uart_data(crypto_data, sizeof(crypto_data));
 
-                /*
-                uint8_t encrypted_sts_data[256]; // Adjust size as needed
-                size_t encrypted_length = sizeof(encrypted_sts_data);
-                // int ret = encrypt_with_ecdh(crypto_data, sizeof(crypto_data),
-                //                             public_key,
-                //                             encrypted_sts_data, &encrypted_length);
-                int ret = encrypt_with_public_key(crypto_data, sizeof(crypto_data),
-                                                  public_key,
-                                                  encrypted_sts_data, &encrypted_length);
-                // send_loc_resp();
-                send_ble_message(crypto_data, sizeof(crypto_data));
-                */
+            
                 uint8_t encrypted_sts_data[256];
                 size_t encrypted_length = sizeof(encrypted_sts_data);
                 uint8_t complete_message[256 + 65 + 12 + 32];
                 uint8_t ephemeral_public[65];
                 uint8_t iv[12];
 
-                // Updated function call with new parameters
                 int ret = encrypt_with_public_key(crypto_data, sizeof(crypto_data),
                                                   public_key,
                                                   encrypted_sts_data, &encrypted_length,
@@ -1881,7 +1478,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 if (ret == 0)
                 {
                     size_t total_length = 0;
-                    memcpy(complete_message, global_n_dev, 32); // Start with n_dev
+                    memcpy(complete_message, global_n_dev, 32); 
                     total_length += 32;
                     memcpy(complete_message + total_length, ephemeral_public, 65);
                     total_length += 65;
@@ -1927,7 +1524,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
 static void ble_host_task(void *param)
 {
     ESP_LOGI(TAG, "BLE Host Task Started");
-    nimble_port_run(); // This function will return only when nimble_port_stop() is executed
+    nimble_port_run();
     nimble_port_freertos_deinit();
 }
 
@@ -1935,7 +1532,6 @@ static void ble_sync_cb(void)
 {
     int rc;
 
-    // Figure out address to use
     rc = ble_hs_id_infer_auto(0, &own_addr_type);
     if (rc != 0)
     {
@@ -1943,10 +1539,8 @@ static void ble_sync_cb(void)
         return;
     }
 
-    // Initialize extended advertising
     ext_adv_init();
 
-    // Initialize and start scanning
     ble_scanner_init();
 
     ESP_LOGI(TAG, "BLE stack synchronized");
@@ -1954,7 +1548,6 @@ static void ble_sync_cb(void)
 
 void app_main(void)
 {
-    // Initialize NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
@@ -1965,27 +1558,20 @@ void app_main(void)
 
     uart_init();
 
-    // ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
-    // ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init_sta();
 
-    // Initialize the NimBLE stack
     nimble_port_init();
 
-    // Initialize our mbuf pool
     init_large_mbuf_pool();
 
-    // Initialize the NimBLE host configuration
-    ble_hs_cfg.sync_cb = ble_sync_cb; // Use our new sync callback
+    ble_hs_cfg.sync_cb = ble_sync_cb; 
     ble_hs_cfg.reset_cb = NULL;
     ble_hs_cfg.store_status_cb = NULL;
 
-    // Set security IOCap - match with your transmitter device
     ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
     ble_hs_cfg.sm_sc = 0;
 
-    // Start the NimBLE host task
     nimble_port_freertos_init(ble_host_task);
     xTaskCreate(uart_task, "uart_task", 4096, NULL, 10, NULL);
 

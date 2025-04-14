@@ -19,7 +19,6 @@
 
 #include "esp_log.h"
 #include "nvs_flash.h"
-/* BLE */
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
@@ -27,7 +26,6 @@
 #include "console/console.h"
 #include "services/gap/ble_svc_gap.h"
 #define CONFIG_EXAMPLE_EXTENDED_ADV 1
-/* non ble imports */
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -46,7 +44,6 @@
 #include "esp_netif.h"
 #include "host/ble_hs_mbuf.h"
 
-// ble config
 static const char *tag = "NimBLE_BLE_PRPH";
 static int bleprph_gap_event(struct ble_gap_event *event, void *arg);
 #if CONFIG_EXAMPLE_RANDOM_ADDR
@@ -76,7 +73,7 @@ void ble_store_config_init(void);
 
 #define BUF_SIZE (254)
 
-#define MBUF_DATA_SIZE 260 // Maximum advertising data length is 255 bytes
+#define MBUF_DATA_SIZE 260 
 
 #define EXAMPLE_ESP_WIFI_SSID "PAISA-AP"
 #define EXAMPLE_ESP_WIFI_PASS "paisapass"
@@ -89,12 +86,10 @@ void ble_store_config_init(void);
 static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num = 0;
 static const char *WIFI_TAG = "wifi_connection";
-// Declare the mbuf pool variables
 struct os_mbuf_pool large_mbuf_pool;
 struct os_mempool large_mbuf_mempool;
 uint8_t large_mbuf_buffer[OS_MEMPOOL_BYTES(10, MBUF_DATA_SIZE)];
 
-// Add WiFi event handler
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
@@ -138,7 +133,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-// Add WiFi initialization function
 void wifi_init(void)
 {
     s_wifi_event_group = xEventGroupCreate();
@@ -168,7 +162,6 @@ void wifi_init(void)
                                                         &instance_got_ip));
 }
 
-// Add STA mode start function
 void wifi_start_sta(void)
 {
 #define SSID "THE BEST TP LINK"
@@ -258,7 +251,6 @@ void udp_connection_w_mfr(uint8_t *data, int len)
         return;
     }
 
-// Print the bytes in both hex and ASCII format
 ESP_LOGI(tag, "Sending UART data (length: %d)", len);
 printf("Hex: ");
 for(int i = 0; i < len; i++) {
@@ -266,7 +258,7 @@ for(int i = 0; i < len; i++) {
 }
 printf("\nASCII: ");
 for(int i = 0; i < len; i++) {
-    if(data[i] >= 32 && data[i] <= 126) { // Only print printable ASCII characters
+    if(data[i] >= 32 && data[i] <= 126) { 
         printf("%c", data[i]);
     } else {
         printf(".");
@@ -297,16 +289,14 @@ void init_large_mbuf_pool(void)
 {
     int rc;
 
-    // Initialize the memory pool for mbufs
     rc = os_mempool_init(
         &large_mbuf_mempool,
-        10, // Number of mbufs in the pool
+        10,
         MBUF_DATA_SIZE,
         large_mbuf_buffer,
         "large_mbuf_mempool");
     assert(rc == 0);
 
-    // Initialize the mbuf pool with the memory pool
     rc = os_mbuf_pool_init(
         &large_mbuf_pool,
         &large_mbuf_mempool,
@@ -343,129 +333,32 @@ static void ext_bleprph_advertise_init(void)
     instance = 0;
     int rc;
 
-    /* First check if any instance is already active */
     if (ble_gap_ext_adv_active(instance))
     {
         rc = ble_gap_ext_adv_stop(instance);
         assert(rc == 0);
     }
 
-    /* use defaults for non-set params */
     memset(&params, 0, sizeof(params));
 
-    /* enable connectable advertising */
     params.connectable = 0;
     params.scannable = 0;
     params.legacy_pdu = 0;
 
-    /* advertise using random addr */
     params.own_addr_type = BLE_OWN_ADDR_PUBLIC;
 
     params.primary_phy = BLE_HCI_LE_PHY_1M;
     params.secondary_phy = BLE_HCI_LE_PHY_2M;
-    // params.tx_power = 127;
     params.sid = 1;
 
     params.itvl_min = BLE_GAP_ADV_FAST_INTERVAL1_MIN;
     params.itvl_max = BLE_GAP_ADV_FAST_INTERVAL1_MIN;
 
-    /* configure instance 0 */
     rc = ble_gap_ext_adv_configure(instance, &params, NULL,
                                    bleprph_gap_event, NULL);
     assert(rc == 0);
 }
 
-/**
- * Enables advertising with the following parameters:
- *     o General discoverable mode.
- *     o Undirected connectable mode.
- */
-
-/*
-
-static void ext_bleprph_advertise(const uint8_t* r_msg, int msglen)
-{
-    struct os_mbuf *data;
-    int rc;
-
-    // Add debug print
-    printf("Incoming UART message length: %d\n", msglen);
-    printf("UART message content: ");
-    for(int i = 0; i < msglen; i++) {
-        printf("%02X ", r_msg[i]);
-    }
-    printf("\n");
-
-    // ???????????????????????????????????????
-    if (msglen > 23) {
-        printf("msglen: %d", msglen);
-        printf("Warning: Message too long for advertisement packet\n");
-        msglen = msglen/2;  // Truncate to maximum allowed
-        printf("msglen: %d", msglen);
-    }
-
-    uint8_t total_adv_length = 3 + 2 + 2 + msglen;
-
-    uint8_t* adv_data = malloc(total_adv_length);
-    if (adv_data == NULL) {
-        printf("Memory allocation failed!\n");
-        return;
-    }
-
-    // Standard flags
-    adv_data[0] = 0x02;           // Length of flags field
-    adv_data[1] = 0x01;           // Flags data type
-    adv_data[2] = 0x06;           // Flags value
-
-    // Manufacturer specific data
-    adv_data[3] = msglen + 3;     // Length of mfg specific data (payload + company ID)
-    adv_data[4] = 0xFF;           // Manufacturer specific data type
-    adv_data[5] = 0xE5;           // Company ID (LSB)
-    adv_data[6] = 0x02;           // Company ID (MSB)
-
-    memcpy(&adv_data[7], r_msg, msglen);
-
-    // Debug print the final advertisement packet
-    printf("Final advertisement packet (%d bytes): ", total_adv_length);
-    for(int i = 0; i < total_adv_length; i++) {
-        printf("%02X ", adv_data[i]);
-    }
-    printf("\n");
-
-    // Make sure advertising is stopped before setting new data
-    ble_gap_ext_adv_stop(instance);
-
-    data = os_msys_get_pkthdr(&large_mbuf_pool, 0);
-    if (!data) {
-        printf("Failed to allocate mbuf!\n");
-        free(adv_data);
-        return;
-    }
-
-    rc = os_mbuf_append(data, adv_data, total_adv_length);
-    if (rc != 0) {
-        printf("Failed to append to mbuf! rc=%d\n", rc);
-        free(adv_data);
-        return;
-    }
-
-    rc = ble_gap_ext_adv_set_data(instance, data);
-    if (rc != 0) {
-        printf("Failed to set advertisement data! rc=%d\n", rc);
-        free(adv_data);
-        return;
-    }
-
-    rc = ble_gap_ext_adv_start(instance, 0, 0);
-    if (rc != 0) {
-        printf("Failed to start advertising! rc=%d\n", rc);
-        free(adv_data);
-        return;
-    }
-
-    free(adv_data);
-    printf("Advertisement started successfully\n");
-}*/
 static void ext_bleprph_advertise(const uint8_t *r_msg, int msglen)
 {
     struct os_mbuf *data;
@@ -473,7 +366,6 @@ static void ext_bleprph_advertise(const uint8_t *r_msg, int msglen)
     const char *loc_paisa = "LOC-PAISA";
     int loc_paisa_len = strlen(loc_paisa);
 
-    // Limit to first 99 bytes
     int payload_len = msglen;
 
     printf("UART data (first %d bytes): ", payload_len);
@@ -483,9 +375,7 @@ static void ext_bleprph_advertise(const uint8_t *r_msg, int msglen)
     }
     printf("\n");
 
-    // Calculate total length including LOC-PAISA
-    uint8_t total_adv_length = 3 + 2 + 2 + loc_paisa_len + payload_len; // Flags + header + company ID + LOC-PAISA + payload
-
+    uint8_t total_adv_length = 3 + 2 + 2 + loc_paisa_len + payload_len;
     uint8_t *adv_data = malloc(total_adv_length);
     if (adv_data == NULL)
     {
@@ -493,24 +383,19 @@ static void ext_bleprph_advertise(const uint8_t *r_msg, int msglen)
         return;
     }
 
-    // Standard flags
     adv_data[0] = 0x02; // Length of flags field
     adv_data[1] = 0x01; // Flags data type
     adv_data[2] = 0x06; // Flags value
 
-    // Manufacturer specific data
-    adv_data[3] = payload_len + loc_paisa_len + 3; // Length of mfg specific data (payload + LOC-PAISA + company ID)
+    adv_data[3] = payload_len + loc_paisa_len + 3; 
     adv_data[4] = 0xFF;                            // Manufacturer specific data type
     adv_data[5] = 0xE5;                            // Company ID (LSB)
     adv_data[6] = 0x02;                            // Company ID (MSB)
 
-    // Add LOC-PAISA
     memcpy(&adv_data[7], loc_paisa, loc_paisa_len);
 
-    // Copy UART data after LOC-PAISA
     memcpy(&adv_data[7 + loc_paisa_len], r_msg, payload_len);
 
-    // Debug print the final advertisement packet
     printf("Final advertisement packet (%d bytes): ", total_adv_length);
     for (int i = 0; i < total_adv_length; i++)
     {
@@ -518,7 +403,6 @@ static void ext_bleprph_advertise(const uint8_t *r_msg, int msglen)
     }
     printf("\n");
 
-    // Make sure advertising is stopped before setting new data
     ble_gap_ext_adv_stop(instance);
 
     data = os_mbuf_get_pkthdr(&large_mbuf_pool, 0);
@@ -556,8 +440,6 @@ static void ext_bleprph_advertise(const uint8_t *r_msg, int msglen)
     free(adv_data);
     printf("Advertisement started successfully\n");
 }
-// msg: ["DP-RES" (6) || n_dev(12) || num_of_n_usr(1) || n_usr_list(12*num_of_n_usr) || M_SRV_URL(10) || attest_result(1) || attest_time(4) || signature(variable)]
-
 static void
 ble_scan(void)
 {
@@ -565,7 +447,6 @@ ble_scan(void)
     struct ble_gap_disc_params disc_params;
     int rc;
     ble_gap_disc_cancel();
-    /* Figure out address to use while advertising (no privacy for now) */
     rc = ble_hs_id_infer_auto(0, &own_addr_type);
     if (rc != 0)
     {
@@ -573,18 +454,10 @@ ble_scan(void)
         return;
     }
 
-    /* Tell the controller to filter duplicates; we don't want to process
-     * repeated advertisements from the same device.
-     */
     disc_params.filter_duplicates = 1;
 
-    /**
-     * Perform a passive scan.  I.e., don't send follow-up scan requests to
-     * each advertiser.
-     */
     disc_params.passive = 1;
 
-    /* Use defaults for the rest of the parameters. */
     disc_params.itvl = 0;
     disc_params.window = 0;
     disc_params.filter_policy = 0;
@@ -611,11 +484,9 @@ ble_app_set_addr(void)
     ble_addr_t addr;
     int rc;
 
-    /* generate new non-resolvable private address */
     rc = ble_hs_id_gen_rnd(0, &addr);
     assert(rc == 0);
 
-    /* set generated address */
     rc = ble_hs_id_set_rnd(addr.val);
 
     assert(rc == 0);
@@ -627,11 +498,9 @@ bleprph_on_sync(void)
     int rc;
 
 #if CONFIG_EXAMPLE_RANDOM_ADDR
-    /* Generate a non-resolvable private address. */
     ble_app_set_addr();
 #endif
 
-    /* Make sure we have proper identity address set (public preferred) */
 #if CONFIG_EXAMPLE_RANDOM_ADDR
     rc = ble_hs_util_ensure_addr(1);
 #else
@@ -639,7 +508,6 @@ bleprph_on_sync(void)
 #endif
     assert(rc == 0);
 
-    /* Figure out address to use while advertising (no privacy for now) */
     rc = ble_hs_id_infer_auto(0, &own_addr_type);
     if (rc != 0)
     {
@@ -647,16 +515,12 @@ bleprph_on_sync(void)
         return;
     }
 
-    /* Printing ADDR */
     uint8_t addr_val[6] = {0};
     rc = ble_hs_id_copy_addr(own_addr_type, addr_val, NULL);
 
     MODLOG_DFLT(INFO, "Device Address: ");
-    // print_addr(addr_val);
     MODLOG_DFLT(INFO, "\n");
-    /* Begin scanning. */
 
-    // ext_bleprph_advertise(); // commented this out
     ext_bleprph_advertise_init();
     ble_scan();
 }
@@ -664,7 +528,6 @@ bleprph_on_sync(void)
 void bleprph_host_task(void *param)
 {
     ESP_LOGD(tag, "BLE Host Task Started");
-    /* This function will return only when nimble_port_stop() is executed */
     nimble_port_run();
 
     nimble_port_freertos_deinit();
@@ -673,7 +536,6 @@ void bleprph_host_task(void *param)
 bool contains_DB_PAISA(const uint8_t *data, size_t data_length)
 {
     uint8_t db_paisa_id[] = {0x44, 0x50, 0x2d, 0x52, 0x45, 0x51};
-    // Iterate through the data array
     if (data_length < sizeof(db_paisa_id))
     {
         return false;
@@ -681,13 +543,12 @@ bool contains_DB_PAISA(const uint8_t *data, size_t data_length)
 
     for (size_t i = 0; i <= data_length - sizeof(db_paisa_id); ++i)
     {
-        // Check if the current position matches the start of the series
         if (memcmp(data + i, db_paisa_id, sizeof(db_paisa_id)) == 0)
         {
-            return true; // Series found
+            return true; 
         }
     }
-    return false; // Series not found
+    return false; 
 }
 
 bool contains_LOC_RESP(const uint8_t *data, size_t data_length)
@@ -695,13 +556,11 @@ bool contains_LOC_RESP(const uint8_t *data, size_t data_length)
     const char *loc_resp = "LOC-RESP";
     size_t resp_len = strlen(loc_resp);
 
-    // Need at least header (7 bytes) plus marker length
     if (data_length < 7 + resp_len)
     {
         return false;
     }
 
-    // Start checking after manufacturer specific data header
     for (size_t i = 7; i <= data_length - resp_len; ++i)
     {
         if (memcmp(data + i, loc_resp, resp_len) == 0)
@@ -719,43 +578,33 @@ static void send_uart_data(const uint8_t *data, uint8_t data_len)
     size_t start_marker_len = strlen(start_marker);
     size_t end_marker_len = strlen(end_marker);
 
-    // Calculate required buffer size with safety margin
-    size_t required_size = start_marker_len + data_len + end_marker_len + 1; // +1 for NULL terminator
+    size_t required_size = start_marker_len + data_len + end_marker_len + 1;
     
-    // Check for potential overflow
     if (required_size > BUF_SIZE) {
         ESP_LOGE(tag, "Data too large for buffer: %d bytes needed, %d available", 
                  required_size, BUF_SIZE);
-        // Either truncate data or return
         data_len = BUF_SIZE - start_marker_len - end_marker_len - 1;
         ESP_LOGW(tag, "Truncating data to %d bytes", data_len);
     }
 
-    // Use a static buffer instead of malloc to avoid fragmentation
     static char buf[BUF_SIZE];
     memset(buf, 0, BUF_SIZE);
 
-    // Build complete message: START_MARKER + DATA + END_MARKER
     size_t pos = 0;
 
-    // Copy start marker
     memcpy(buf, start_marker, start_marker_len);
     pos += start_marker_len;
 
-    // Copy data if present
     if (data && data_len > 0) {
         memcpy(buf + pos, data, data_len);
         pos += data_len;
     }
 
-    // Copy end marker
     memcpy(buf + pos, end_marker, end_marker_len);
     pos += end_marker_len;
     
-    // Ensure null termination
     buf[pos] = '\0';
 
-    // Print complete message before sending
     ESP_LOGI(tag, "Sending message (hex): ");
     for (size_t i = 0; i < pos; i++) {
         printf("%02X", (unsigned char)buf[i]);
@@ -766,7 +615,6 @@ static void send_uart_data(const uint8_t *data, uint8_t data_len)
     ESP_LOGI(tag, "Sending complete message:");
 
     uart_write_bytes(ECHO_UART_PORT_NUM, buf, pos);
-   // free(buf);
 }
 
 static int bleprph_gap_event(struct ble_gap_event *event, void *arg)
@@ -791,10 +639,8 @@ static int bleprph_gap_event(struct ble_gap_event *event, void *arg)
         return 0;
 
     case BLE_GAP_EVENT_EXT_DISC:
-        /* An advertisement report was received during GAP discovery. */
         const struct ble_gap_ext_disc_desc *disc = (struct ble_gap_ext_disc_desc *)&event->disc;
 
-        // Check if we received a LOC-RESP message
         if (disc->legacy_event_type == 0 && contains_LOC_RESP(disc->data, disc->length_data))
         {
             rc = ble_gap_disc_cancel();
@@ -803,7 +649,6 @@ static int bleprph_gap_event(struct ble_gap_event *event, void *arg)
             const uint8_t *u8p;
             u8p = disc->addr.val;
 
-            // Process the LOC-RESP message
             ESP_LOGI(tag, "Received LOC-RESP from device: %02x:%02x:%02x:%02x:%02x:%02x",
                      u8p[5], u8p[4], u8p[3], u8p[2], u8p[1], u8p[0]);
 
@@ -816,8 +661,6 @@ static int bleprph_gap_event(struct ble_gap_event *event, void *arg)
 
 void uart_init(void)
 {
-    /* Configure parameters of an UART driver,
-     * communication pins and install the driver */
     uart_config_t uart_config = {
         .baud_rate = ECHO_UART_BAUD_RATE,
         .data_bits = UART_DATA_8_BITS,
@@ -869,7 +712,6 @@ static void uart_task()
 
             ESP_LOGI(RX_TASK_TAG, "\n=== Message Components Breakdown ===\n");
 
-            // Print n_dev (32 bytes)
             ESP_LOGI(RX_TASK_TAG, "n_dev (32 bytes):");
             for (int i = 0; i < 32; i++)
             {
@@ -877,7 +719,6 @@ static void uart_task()
             }
             printf("\n");
 
-            // Print curTS (4 bytes)
             ESP_LOGI(RX_TASK_TAG, "curTS (4 bytes):");
             for (int i = 32; i < 36; i++)
             {
@@ -886,12 +727,10 @@ static void uart_task()
             uint32_t curTs = *(uint32_t *)(data + 32);
             printf(" (Decimal: %lu)\n", curTs);
 
-            // Calculate signature length and position
             int sig_start = 36;
             int url_len = data[rxBytes - 6];
             int sig_len = rxBytes - (sig_start + url_len + 6);
 
-            // Print signature
             ESP_LOGI(RX_TASK_TAG, "signature (length %d):", sig_len);
             for (int i = sig_start; i < sig_start + sig_len; i++)
             {
@@ -899,7 +738,6 @@ static void uart_task()
             }
             printf("\n");
 
-            // Print M_SRV_URL
             ESP_LOGI(RX_TASK_TAG, "M_SRV_URL (%d bytes): ", url_len);
             for (int i = sig_start + sig_len; i < sig_start + sig_len + url_len; i++)
             {
@@ -907,10 +745,8 @@ static void uart_task()
             }
             printf("\n");
 
-            // Print attest_result (1 byte)
             ESP_LOGI(RX_TASK_TAG, "attest_result (1 byte): %02X", data[rxBytes - 5]);
 
-            // Print time_attest (4 bytes)
             ESP_LOGI(RX_TASK_TAG, "time_attest (4 bytes):");
             for (int i = rxBytes - 4; i < rxBytes; i++)
             {
@@ -919,7 +755,6 @@ static void uart_task()
             uint32_t time_attest = *(uint32_t *)(data + rxBytes - 4);
             printf(" (Decimal: %lu)\n", time_attest);
 
-            // Print full message
             ESP_LOGI(RX_TASK_TAG, "\n=== Complete Raw Message ===");
             ESP_LOGI(RX_TASK_TAG, "Full message (length %d):", rxBytes);
             for (int i = 0; i < rxBytes; i++)
@@ -929,18 +764,15 @@ static void uart_task()
             printf("\n");
             if (strncmp((const char *)data + rxBytes - strlen("MSGEND"), "MSGEND", strlen("MSGEND")) == 0)
             {
-                // Handle manufacturer server communication
                 wifi_start_sta();
                 udp_connection_w_mfr(data, rxBytes);
-                // Return to normal operation
                 ext_bleprph_advertise_init();
                 ble_scan();
             }
             else if (strncmp((const char *)data + rxBytes - strlen(BRD_END_CHAR), BRD_END_CHAR, strlen(BRD_END_CHAR)) == 0)
             {
-                ext_bleprph_advertise(data, rxBytes /* - strlen(BRD_END_CHAR)*/);
+                ext_bleprph_advertise(data, rxBytes);
 
-                // wait 3 seconds
                 ESP_LOGI(tag, "Read %d bytes: '%s'", rxBytes, data);
                 vTaskDelay(3000 / portTICK_PERIOD_MS);
                 int rc = ble_gap_ext_adv_stop(instance);
@@ -950,7 +782,6 @@ static void uart_task()
             }
             else if (strncmp((const char *)data + rxBytes - strlen(NSC_END_CHAR), NSC_END_CHAR, strlen(NSC_END_CHAR)) == 0)
             {
-                // This message is assumed to be sent out to server, but we do not implement the server side
                 ESP_LOGI(RX_TASK_TAG, "[%lld us] Temperature: %f", esp_timer_get_time(), *(float *)data);
             }
             else
@@ -962,16 +793,13 @@ static void uart_task()
                     assert(rc == 0);
                 }
                 ESP_LOGI(RX_TASK_TAG, "OTHER CASE STARTING TO ADVERTISE");
-                ext_bleprph_advertise(data, rxBytes /* - strlen(BRD_END_CHAR)*/);
-                // vTaskDelay(1000 / portTICK_PERIOD_MS);
+                ext_bleprph_advertise(data, rxBytes);
                 vTaskDelay(3000 / portTICK_PERIOD_MS);
                 rc = ble_gap_ext_adv_stop(instance);
                 assert(rc == 0);
 
                 ble_scan();
-                ///  int rc = ble_gap_ext_adv_stop(instance);
-                /// assert(rc == 0);
-                /// ESP_LOGI(RX_TASK_TAG, "OTHER CASE STOPPING TO ADVERTISE");
+               
             }
         }
     }
@@ -982,7 +810,6 @@ void app_main(void)
 {
     int rc;
 
-    /* Initialize NVS — it is used to store PHY calibration data */
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
@@ -993,17 +820,14 @@ void app_main(void)
 
  wifi_init();
 
-    // uart init
     uart_init();
 
-    // nimble init
     ret = nimble_port_init();
     if (ret != ESP_OK)
     {
         ESP_LOGE(tag, "Failed to init nimble %d ", ret);
         return;
     }
-    /* Initialize the NimBLE host configuration. */
     ble_hs_cfg.reset_cb = bleprph_on_reset;
     ble_hs_cfg.sync_cb = bleprph_on_sync;
     ble_hs_cfg.sm_io_cap = CONFIG_EXAMPLE_IO_TYPE;
@@ -1020,10 +844,8 @@ void app_main(void)
 
     nimble_port_freertos_init(bleprph_host_task); // scanning
 
-    // UART Task to read responses from IoT main device (NXP)
     xTaskCreate(uart_task, "uart_task", ECHO_TASK_STACK_SIZE, NULL, 10, NULL);
 
-// Eval Task only needed for evaluation
 #if EVALUATION_CONFIG
     xTaskCreate(eval_task, "eval_task", ECHO_TASK_STACK_SIZE, NULL, 10, NULL);
 #endif

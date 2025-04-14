@@ -112,8 +112,8 @@ static dwt_sts_cp_key_t cp_key = { 0x14EB220F, 0xF86050A8, 0xD1D336AA, 0x1414867
 static dwt_sts_cp_iv_t cp_iv = { 0x1F9A3DE4, 0xD37EC3CA, 0xC44FA8FB, 0x362EEB34 };
 
 /* UART Configuration */
-#define UART_RX_PIN  8  // P0.08
-#define UART_TX_PIN 6   // P0.06
+#define UART_RX_PIN  8
+#define UART_TX_PIN 6
 #define UART_BAUDRATE NRF_UART_BAUDRATE_115200
 #define RX_BUF_SIZE 256
 #define START_MARKER "PAISASTART:"
@@ -142,10 +142,10 @@ void findMessage(const uint8_t* buffer, uint16_t length) {
                     
                     printf("\n\nASCII representation:\n");
                     for (uint16_t k = msgStart; k < j; k++) {
-                        if (isprint(buffer[k])) {  // If character is printable
+                        if (isprint(buffer[k])) {
                             printf("%c", buffer[k]);
                         } else {
-                            printf("."); // Print dot for non-printable characters
+                            printf(".");
                         }
                         if ((k - msgStart + 1) % 16 == 0) {
                             printf("\n");
@@ -153,17 +153,14 @@ void findMessage(const uint8_t* buffer, uint16_t length) {
                     }
                     printf("\n\nSide by side (16 bytes per line):\n");
                     for (uint16_t k = msgStart; k < j; k += 16) {
-                        // Print hex values
                         for (uint16_t m = k; m < k + 16 && m < j; m++) {
                             printf("%02X ", buffer[m]);
                         }
-                        // Pad with spaces if less than 16 bytes
                         for (uint16_t m = j; m < k + 16; m++) {
                             printf("   ");
                         }
-                        printf("   ");  // Separator between hex and ASCII
+                        printf("   ");
                         
-                        // Print ASCII values
                         for (uint16_t m = k; m < k + 16 && m < j; m++) {
                             if (isprint(buffer[m])) {
                                 printf("%c", buffer[m]);
@@ -174,45 +171,38 @@ void findMessage(const uint8_t* buffer, uint16_t length) {
                         printf("\n");
                     }
                     printf("\n");
-                    //return;
                 }
             }
         }
     }
 }
 
-/* Function to update STS key and IV from received data */
 void update_sts_key_iv(const uint8_t* data, uint16_t length) {
-    if (length < 36) {  // Updated from 32 to 36 to include src/dst addresses
+    if (length < 36) {
         printf("Not enough data for key, IV, and addresses update\n");
         return;
     }
 
-    // Convert first 16 bytes to cp_key (4 x 32-bit words)
     cp_key.key0 = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
     cp_key.key1 = (data[4] << 24) | (data[5] << 16) | (data[6] << 8) | data[7];
     cp_key.key2 = (data[8] << 24) | (data[9] << 16) | (data[10] << 8) | data[11];
     cp_key.key3 = (data[12] << 24) | (data[13] << 16) | (data[14] << 8) | data[15];
 
-    // Convert next 16 bytes to cp_iv (4 x 32-bit words)
     cp_iv.iv0 = (data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19];
     cp_iv.iv1 = (data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23];
     cp_iv.iv2 = (data[24] << 24) | (data[25] << 16) | (data[26] << 8) | data[27];
     cp_iv.iv3 = (data[28] << 24) | (data[29] << 16) | (data[30] << 8) | data[31];
 
-    // Update source and destination addresses in rx_poll_msg
-    // Source address (bytes 32-33 from received data)
-    rx_poll_msg[7] = data[32];  // Source address high byte
-    rx_poll_msg[8] = data[33];  // Source address low byte
-    // Destination address (bytes 34-35 from received data)
-    rx_poll_msg[5] = data[34];  // Destination address high byte
-    rx_poll_msg[6] = data[35];  // Destination address low byte
 
-    // Update source and destination addresses in tx_resp_msg (swapped since it's responding)
-    tx_resp_msg[7] = data[34];  // Source address = original destination
-    tx_resp_msg[8] = data[35];  // Source address = original destination
-    tx_resp_msg[5] = data[32];  // Destination address = original source
-    tx_resp_msg[6] = data[33];  // Destination address = original source
+    rx_poll_msg[7] = data[32];
+    rx_poll_msg[8] = data[33];
+    rx_poll_msg[5] = data[34];
+    rx_poll_msg[6] = data[35];
+
+    tx_resp_msg[7] = data[34];
+    tx_resp_msg[8] = data[35];
+    tx_resp_msg[5] = data[32];
+    tx_resp_msg[6] = data[33];
 
     printf("Updated STS key and IV:\n");
     printf("Key: %08lX %08lX %08lX %08lX\n", 
@@ -222,53 +212,42 @@ void update_sts_key_iv(const uint8_t* data, uint16_t length) {
     printf("Updated addresses - Src: %02X%02X, Dst: %02X%02X\n",
            data[32], data[33], data[34], data[35]);
 }
-/* UART event handler */
 void uart_event_handler(nrf_drv_uart_event_t *p_event, void *p_context)
 {
     if (p_event->type == NRF_DRV_UART_EVT_RX_DONE)
     {
-        // Store the byte in the buffer
         if (bufferIndex < RX_BUF_SIZE)
         {
             rxBuffer[bufferIndex++] = rx_buf[0];
 
-            // Check if we have an end marker
             if (bufferIndex >= strlen(END_MARKER) &&
                 memcmp(&rxBuffer[bufferIndex - strlen(END_MARKER)],
                       END_MARKER, strlen(END_MARKER)) == 0)
             {
-                // Find the start marker
                 for (uint16_t i = 0; i < bufferIndex - strlen(START_MARKER); i++) {
                     if (memcmp(&rxBuffer[i], START_MARKER, strlen(START_MARKER)) == 0) {
                         uint16_t dataStart = i + strlen(START_MARKER);
                         uint16_t dataLength = bufferIndex - dataStart - strlen(END_MARKER);
                         
-                        // Update STS key and IV if we have enough data
                         if (dataLength >= 32) {
                             update_sts_key_iv(&rxBuffer[dataStart], dataLength);
                         }
                         break;
                     }
                 }
-                
-                // Reset buffer after processing
                 bufferIndex = 0;
             }
         }
         else
         {
-            // Buffer is full, reset it
             bufferIndex = 0;
         }
 
-        // Start receiving next byte
         nrf_drv_uart_rx(&uart_instance, rx_buf, 1);
     }
 }
-/* Initialize UART for reception */
 void uart_init(void)
 {
-    // Make sure UART pins are configured as GPIO inputs first
     nrf_gpio_cfg_input(UART_RX_PIN, NRF_GPIO_PIN_PULLUP);
     
     nrf_drv_uart_config_t uart_config = {
@@ -280,7 +259,7 @@ void uart_init(void)
         .hwfc = NRF_UART_HWFC_DISABLED,
         .parity = NRF_UART_PARITY_EXCLUDED,
         .baudrate = UART_BAUDRATE,
-        .interrupt_priority = APP_IRQ_PRIORITY_HIGH  // Set high priority for UART interrupts
+        .interrupt_priority = APP_IRQ_PRIORITY_HIGH
     };
 
     printf("Initializing UART RX...\n");
@@ -288,7 +267,6 @@ void uart_init(void)
     printf("Baudrate: %d\n", uart_config.baudrate);
     printf("IRQ Priority: %d\n", uart_config.interrupt_priority);
     
-    // Initialize UART with event handler
     uint32_t err_code = nrf_drv_uart_init(&uart_instance, &uart_config, uart_event_handler);
     if (err_code != NRF_SUCCESS)
     {
@@ -296,10 +274,8 @@ void uart_init(void)
         return;
     }
     
-    // Enable UART receiver
     nrf_drv_uart_rx_enable(&uart_instance);
     
-    // Start receiving first byte
     err_code = nrf_drv_uart_rx(&uart_instance, rx_buf, 1);
     if (err_code != NRF_SUCCESS)
     {

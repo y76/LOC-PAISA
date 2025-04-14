@@ -117,12 +117,7 @@ typedef void (*NonSecureResetHandler_t)(void) __attribute__((cmse_nonsecure_call
 #define ATT_SIZE			(1)
 #define TIME_PREV			(1681506039)
 #define ID_DEV				(19682938)
-//#define PRV_DEV_KEY_PEM "-----BEGIN PRIVATE KEY-----\r\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCdxdKced+CH6V6\r\nZKUTNCKveBLKkJOFdYWMsnenSxOhnAO9/U6AXIk67PDMLklx6dS8ODJOtrFDpm3q\r\nGitEV8Tz4ImbVQBlCnqtcCtgaK0mOnSs9q9dwNMRospPeORcrTAl4aD0iQWLPSAs\r\n+uRxaKUigKFd2w0RTVp0wFbswMkGHYrgvgngJtMXWJrbfcGoI5z3vhAfKHhu7+Qk\r\nLShqnuYCmbZNeHh+2QEPgwLNBD5gXJKB7NyyV2miekMR77C6cM5/t0tkOAFRsq2H\r\nIbXqnjhEo2ePc3h3CXps+4DqmL/T0MCl3XvKrxvtpT0NPJWIF9EJiksmzofKretg\r\nmYGgnDoJAgMBAAECggEAIth+wC2QplIr/6C77sZchMmtyMxusJK4uM7v62SDBPYK\r\nw4rvLB2D954+PrJYaU7eO+XjgowKEalv7Dz0YmdKKhzk94gqCqbqWmUER4pG98MA\r\nYvUm3TuJwoLkUPIf6bIciLlRDcE3lr2c3iJZkwysMDcdrLeFJtWhTVjvueGIZI+H\r\n2dR+uwXnVcRgsa0OV7Ad3ybRGlV4D6jQXNIBfhqla0Ae9xXupbm5M+/YbC7JUsKC\r\n7pOxmMB+bhPceqiCQHbfK7866BqdG4+yD0g9LJ9v5JCMqWE///X6wrZ0vZY/zNOz\r\n2CKAJkKDZXjlAHfKjFKRUHNaf4xYWVTdcIMMtHKJkwKBgQDWCZR2qotF+encgG/w\r\n1iGdYrH+qApviUr/yH3rvzelAsI4G/2T4Tt4sSXq7SMSCGoO+4+OnIRt2c3GUwUs\r\nJaWgGrR26Cuw24LXhN9CtOwnkg5VbW2BomVBzXBzE/T5D3ItKX5mKmVSuMGI83TK\r\n/m4lWkbXFOe5q+AdZ+OugIUsTwKBgQC8tFmFfk3/2gbEQw7gZcuITR0dAMAqrPGx\r\nvNZqV6gHjB6ooLqBpjsZ2mNG7+0aPaaXj9VP6q+LvXSdhuUgC0fbtYnV4nyVQhht\r\nEVTzXfBP0eNWYq+WJ1oKgLrX2/Ig7ivAZysXNFZQXYlGKAoLLdepUHiOrkBDn/RE\r\ndoELhuVmJwKBgHt20zkQb35SBuC3Bdt66bELuXkYHczw+V5KnLhceRCqYrZTDxc6\r\nmT+pkCHP4KcKS4ORAOJWzt0/AkAgq58nqD6OqQLeMjW2qecAMnkcPA0nZzVIBh79\r\nOkOW6gK3xFvW2RnMEamFUyVAhgMlzH07/vV0+eAfovurdYAA6YlDgY5pAoGBALEi\r\nnnIoKPHFaNqsk/dittbghDaocLrekxajy6YRWIKVLmZeUhTHxOy0ysJZD/m063+U\r\nHcmh5F1JX4FLkiMtU6vTUmq66vV1ENa5EURN5voWbM+3XVmW4PfA9SMRrMzqpZk7\r\nfwCOOYPA+c4oYZ0y0CF4j2JoAZ05NiNaFjKK0yW7AoGBAMXy/QOYNSBGWcyNOCM6\r\nXz5kqGtGDw+GDG76o+TWOTmnjJa+KKwpW0Hj8SRDF6ngmqjK42sRzgLhm2ke79xd\r\njxwAWt9+fpdd4Bgltn9zWCbqfmwsRUKMrZ43K2Ydc1B1045j/kIvLXhmoP0PVNZQ\r\nDB/NHjpP1IKzPqQemhNUtEku\r\n-----END PRIVATE KEY-----"
-//#define PRV_DEV_KEY_PEM		"-----BEGIN EC PRIVATE KEY-----\r\nMHcCAQEEIF3U39mcfT5CzujDNem0gk4x1bzPodlveTZZhKbJdtFToAoGCCqGSM49\r\nAwEHoUQDQgAEuQnbuq0OifGY0Fb9TlVw+Y8wXX28TiW+Yq38CIx5sVghlTjBmuFh\r\nm0yBJr5L88OHBd9ymb3S5idXq0EStfbv3Q==\r\n-----END EC PRIVATE KEY-----"
 #define PRV_DEV_KEY_PEM			"-----BEGIN EC PRIVATE KEY-----\r\nMHcCAQEEILU1UM1iS7FVYItkMFIjXzAoZ15ggKPolhQpkm8Fpvb+oAoGCCqGSM49\r\nAwEHoUQDQgAE25n7ySdcmAANQrUIgnTl0cMdUy4fkWOW/coAj0af2h56PveM7sqe\r\nMGraQzrlNghIOU2Q3We5HyZhhEypxUJIKg==\r\n-----END EC PRIVATE KEY-----"
-//^this is new key
-//#define PRV_DEV_PRIV_KEY_2 "-----BEGIN EC PRIVATE KEY-----\r\nMHcCAQEEIMCN41GeyddpeoLLRxYWxXuhA6zPWFQP+tUrETjQMCNIoAoGCCqGSM49\r\nAwEHoUQDQgAEmYbN0Zu2DcGhrNVf9zVXlir1Bl8plvUn5imN21xGlZccAWLFmOw6\r\nkNLPGlgDR5io4caAnOtpTlRfKwhC5nKGoA==\r\n-----END EC PRIVATE KEY-----"
-//#define PUB_M_SRV_KEY_PEM "-----BEGIN PUBLIC KEY-----\r\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5rsw8U6LAUNkn5Ww7s5X\r\nDQH0NCnpXA+UdQzbtUb8zzXNrMix6fFBD0+SEJNYoUeYTsm0cAdegCZHlTxCtdW2\r\n8sTyY9ssg7PWIqJZHpQ0WmagOWl06Luh7Wxuk4iMDe68eLnpJgi2X7WsZiA5bmXf\r\nrWpV/15v7VwWvjJrt6C9N3l4KcfTxljRJS3vDCkQuse15lWtKccpKV8fg70Ax0PZ\r\n0hYiWcEGJrXKoFKdeWnxz9Kb36K0mtQddYCdP0ec24ZVkNAcxMlFk+az6P1VvWO7\r\n3UyAat3d4yfH7nZV1h/8vRyHI3+Uh/XCfnwFLemsuK9xygtm3uLjYurOtbZZCtH9\r\n5wIDAQAB\r\n-----END PUBLIC KEY-----"
 #define PUB_M_SRV_KEY_PEM 		"-----BEGIN PUBLIC KEY-----\r\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUoT5Ct1reTJanqFLf6NAm5Kt6G8x\r\n4ngbrnjzTH1fDkQTr0eTDCJeoBPBxSP3kT3IJ8+7UZ/vBGKfYr/MuP6vYg==\r\n-----END PUBLIC KEY-----"
 #define M_SRV_URL				"https://bit.ly/3EJadxK"//"https://bit.ly/430XMb1"//"https://bit.ly/4hAjeaU"//"https://bit.ly/4glPu0g"//"https://bit.ly/3HnHwEu"
 #define MSG_END_CHAR		"MSGEND"
@@ -252,7 +247,7 @@ void __sha256(const char *msg, size_t msg_len, char *digest)
 	mbedtls_sha256_finish(&sha256, digest);
 }
 
-#define MAX_BUFFER_SIZE 256  // Adjust buffer size as needed
+#define MAX_BUFFER_SIZE 256  
 
 #define RX_BUFFER_SIZE 256
 #define START_MARKER "PAISASTART:"
@@ -264,25 +259,19 @@ static uint8_t rxBuffer[MAX_BUFFER_SIZE];
 static uint16_t bufferIndex = 0;
 
 void findMessage(const uint8_t* buffer, uint16_t length) {
-    // Immediate safety checks
     if (!buffer || length == 0) {
-        return;  // Early exit if buffer is invalid
+        return; 
     }
 
-    // Prevent excessive searching
     uint16_t max_search = (length < 1000) ? length : 1000;
 
     for (uint16_t i = 0; i < max_search - START_MARKER_LENGTH + 1; i++) {
-        // Use memcmp with explicit lengths
         if (memcmp(buffer + i, START_MARKER, START_MARKER_LENGTH) == 0) {
             uint16_t msgStart = i + START_MARKER_LENGTH;
 
-            // Bounds-checked inner search
             for (uint16_t j = msgStart; j < max_search - END_MARKER_LENGTH + 1; j++) {
                 if (memcmp(buffer + j, END_MARKER, END_MARKER_LENGTH) == 0) {
-                    // Safe message extraction
                     for (uint16_t k = msgStart; k < j; k++) {
-                        // Optional: add printability check
                         if (isprint(buffer[k])) {
                             PRINTF("%c", buffer[k]);
                         }
@@ -293,57 +282,6 @@ void findMessage(const uint8_t* buffer, uint16_t length) {
         }
     }
 }
-/*
-void WIFI_USART_IRQHandler(void)
-{
-    // Prevent infinite processing
-    uint16_t safety_counter = 0;
-    const uint16_t MAX_ITERATIONS = 100;  // Prevent infinite loop
-
-    while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART) &&
-           safety_counter++ < MAX_ITERATIONS)
-    {
-        // Read the byte
-        uint8_t receivedByte = USART_ReadByte(WIFI_USART);
-
-        // Store the byte in the buffer
-        if (bufferIndex < MAX_BUFFER_SIZE)
-        {
-            rxBuffer[bufferIndex++] = receivedByte;
-
-            // Check if we have an end marker
-            if (bufferIndex >= END_MARKER_LENGTH &&
-                memcmp(&rxBuffer[bufferIndex - END_MARKER_LENGTH],
-                       END_MARKER, END_MARKER_LENGTH) == 0)
-            {
-                // We have a complete message, process it
-                findMessage(rxBuffer, bufferIndex);
-
-                // Forward complete message to UART2
-                USART_WriteBlocking(WIFI_USART2, rxBuffer, bufferIndex);
-
-                // Reset buffer after processing
-                bufferIndex = 0;
-            }
-        }
-        else
-        {
-            // Buffer is full, reset it
-            bufferIndex = 0;
-        }
-    }
-
-    // If safety counter was hit, force buffer reset
-    if (safety_counter >= MAX_ITERATIONS) {
-        bufferIndex = 0;
-        PRINTF("USART Interrupt: Maximum iterations reached. Potential communication issue.\r\n");
-    }
-
-    // Clear any receive errors
-    USART_ClearStatusFlags(WIFI_USART, kUSART_RxError);
-    SDK_ISR_EXIT_BARRIER;
-}*/
-
 static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encrypted_len,
                                   const char *private_key_pem,
                                   const uint8_t *peer_public_key, size_t peer_public_key_len,
@@ -358,13 +296,11 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
     uint8_t shared_secret[32];
     uint8_t tag[16];
 
-    // Initialize contexts
     mbedtls_ecdh_init(&ctx);
     mbedtls_entropy_init(&entropy);
     mbedtls_ctr_drbg_init(&ctr_drbg);
     mbedtls_pk_init(&our_pk);
 
-    // Seed RNG
     ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
                                 (const unsigned char *)pers, strlen(pers));
     if (ret != 0) {
@@ -372,7 +308,6 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
         goto cleanup;
     }
 
-    // Load our private key
     ret = mbedtls_pk_parse_key(&our_pk, (const unsigned char *)private_key_pem,
                               strlen(private_key_pem) + 1, NULL, 0);
     if (ret != 0) {
@@ -380,14 +315,12 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
         goto cleanup;
     }
 
-    // Setup ECDH with the same curve
     ret = mbedtls_ecdh_setup(&ctx, MBEDTLS_ECP_DP_SECP256R1);
     if (ret != 0) {
         PRINTF("Failed to setup ECDH: -0x%x\n", -ret);
         goto cleanup;
     }
 
-    // Load our private key parameters
     const mbedtls_ecp_keypair *our_keypair = mbedtls_pk_ec(our_pk);
     ret = mbedtls_ecdh_get_params(&ctx, our_keypair, MBEDTLS_ECDH_OURS);
     if (ret != 0) {
@@ -395,7 +328,6 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
         goto cleanup;
     }
 
-    // Load peer's ephemeral public key directly from binary
     ret = mbedtls_ecp_point_read_binary(&ctx.grp, &ctx.Qp,
                                        peer_public_key, peer_public_key_len);
     if (ret != 0) {
@@ -403,7 +335,6 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
         goto cleanup;
     }
 
-    // Calculate shared secret
     ret = mbedtls_ecdh_calc_secret(&ctx, &ret, shared_secret, sizeof(shared_secret),
                                   mbedtls_ctr_drbg_random, &ctr_drbg);
     if (ret != 0) {
@@ -411,7 +342,6 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
         goto cleanup;
     }
 
-    // Setup AES-GCM
     mbedtls_gcm_context gcm;
     mbedtls_gcm_init(&gcm);
 
@@ -421,17 +351,15 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
         goto cleanup_gcm;
     }
 
-    // The last 16 bytes are the tag
     *decrypted_len = encrypted_len - 16;
     memcpy(tag, encrypted_data + *decrypted_len, 16);
 
-    // Decrypt and verify
     ret = mbedtls_gcm_auth_decrypt(&gcm, *decrypted_len,
                                   iv, 12,
                                   NULL, 0,
                                   tag, 16,
-                                  encrypted_data, // Just the encrypted portion
-                                  decrypted_data + START_MARKER_LENGTH);  // Leave space for start marker
+                                  encrypted_data, 
+                                  decrypted_data + START_MARKER_LENGTH);
 
     if (ret != 0) {
         PRINTF("Decryption failed: -0x%x\n", -ret);
@@ -442,12 +370,10 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
     memcpy(decrypted_data, START_MARKER, START_MARKER_LENGTH);
     memcpy(decrypted_data + START_MARKER_LENGTH + *decrypted_len, END_MARKER, END_MARKER_LENGTH);
 
-    // Update total length to include markers
     *decrypted_len = *decrypted_len + START_MARKER_LENGTH + END_MARKER_LENGTH;
 
     PRINTF("Decryption successful\n");
 
-    // Print final data with markers
     PRINTF("Final data with markers (hex):\n");
     for (int i = 0; i < *decrypted_len; i++) {
         PRINTF("%02x", decrypted_data[i]);
@@ -460,7 +386,6 @@ static int decrypt_with_private_key(const uint8_t *encrypted_data, size_t encryp
     }
     PRINTF("\n");
 
-    // Debug output for shared secret
     PRINTF("Shared secret:\n");
     for (int i = 0; i < 32; i++) {
         PRINTF("%02x", shared_secret[i]);
@@ -477,37 +402,29 @@ cleanup:
 }
 void WIFI_USART_IRQHandler(void)
 {
-   // Prevent infinite processing
    uint16_t safety_counter = 0;
-   const uint16_t MAX_ITERATIONS = 5; // Prevent infinite loop
+   const uint16_t MAX_ITERATIONS = 5; 
 
    while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART) &&
           safety_counter++ < MAX_ITERATIONS)
    {
-       // Read the byte
        uint8_t receivedByte = USART_ReadByte(WIFI_USART);
 
-       // Store the byte in the buffer
        if (bufferIndex < MAX_BUFFER_SIZE)
        {
            rxBuffer[bufferIndex++] = receivedByte;
 
-           // Check if we have an end marker
            if (bufferIndex >= END_MARKER_LENGTH &&
                memcmp(&rxBuffer[bufferIndex - END_MARKER_LENGTH],
                      END_MARKER, END_MARKER_LENGTH) == 0)
            {
-               // First, call original findMessage for existing logging
                findMessage(rxBuffer, bufferIndex);
 
-               // Find start of actual encryption data (skipping LOC-RESP)
                uint16_t dataStart = 0;
                uint16_t dataEnd = bufferIndex - END_MARKER_LENGTH;
 
-               // Locate where LOC-RESP actually starts
                for (uint16_t i = 0; i < bufferIndex - START_MARKER_LENGTH; i++) {
                    if (memcmp(&rxBuffer[i], START_MARKER, START_MARKER_LENGTH) == 0) {
-                       // Skip the entire LOC-RESP marker
                        dataStart = i + START_MARKER_LENGTH + strlen("LOC-RESP");
                        break;
                    }
@@ -519,39 +436,30 @@ void WIFI_USART_IRQHandler(void)
                }
                PRINTF("\n");
 
-               // Sanity check
                if (dataStart == 0 || dataEnd - dataStart < (32 + 65 + 12 + 16)) {
                    PRINTF("Invalid message format - not enough data\r\n");
                    bufferIndex = 0;
                    continue;
                }
 
-               // Calculate lengths after removing markers and LOC-RESP
                size_t total_message_length = dataEnd - dataStart;
 
-               // Detailed hex dump of the entire message
-               // Option 1
                PRINTF("Raw message data (%lu bytes):\n", (unsigned long)total_message_length);
 
-               // Option 2
                PRINTF("Raw message data (%zd bytes):\n", total_message_length);
 
-               // Option 3
                PRINTF("Raw message data (%d bytes):\n", (int)total_message_length);
                for (size_t i = 0; i < total_message_length; i++) {
                    PRINTF("%02x ", rxBuffer[dataStart + i]);
-                   //if ((i + 1) % 16 == 0) PRINTF("\n");
                }
                PRINTF("\n");
 
-               // If the total message length is too short, bail out
                if (total_message_length < (65 + 12 + 16)) {
                    PRINTF("Message too short for encryption components\r\n");
                    bufferIndex = 0;
                    continue;
                }
 
-               // Extract components from message - now including nonce
                uint8_t *message_start = rxBuffer + dataStart;
                uint8_t *nonce = message_start;  // First 32 bytes - just for printing
                uint8_t *ephemeral_public = message_start + 32;  // Next 65 bytes - used for decryption
@@ -581,7 +489,6 @@ void WIFI_USART_IRQHandler(void)
 
                PRINTF("Nonce match - continuing with decryption\n");
 
-               // Continue with normal decryption using ephemeral_public, iv, and encrypted_data
                PRINTF("Ephemeral public key length: 65\n");
                PRINTF("Detailed ephemeral public key:\n");
                for (int i = 0; i < 65; i++) {
@@ -603,11 +510,9 @@ void WIFI_USART_IRQHandler(void)
                }
                PRINTF("\n");
 
-               // Decrypt the message
                uint8_t decrypted_data[MAX_BUFFER_SIZE];
                size_t decrypted_length = 0;
 
-               // Verbose error tracking
                int ret = decrypt_with_private_key(encrypted_data, encrypted_length,
                                                   PRV_DEV_KEY_PEM,
                                                   ephemeral_public, 65,
@@ -617,45 +522,37 @@ void WIFI_USART_IRQHandler(void)
                PRINTF("Decryption return code: %d (0x%x)\n", ret, -ret);
 
                if (ret == 0) {
-                   // Decryption successful, forward decrypted data
                    USART_WriteBlocking(WIFI_USART2, decrypted_data, decrypted_length);
                }
             else {
-                   PRINTF("Decryption failed with error: %d\r\n");//, ret);
+                   PRINTF("Decryption failed with error: %d\r\n");
                }
 
-               // Reset buffer after processing
                bufferIndex = 0;
            }
        }
        else
        {
-           // Buffer is full, reset it
            bufferIndex = 0;
        }
    }
 
-   // If safety counter was hit, force buffer reset
    if (safety_counter >= MAX_ITERATIONS) {
        bufferIndex = 0;
        PRINTF("USART Interrupt: Maximum iterations reached. Potential communication issue.\r\n");
    }
 
-   // Clear any receive errors
    USART_ClearStatusFlags(WIFI_USART, kUSART_RxError);
    SDK_ISR_EXIT_BARRIER;
 }
 
 void WIFI_USART2_IRQHandler(void)
 {
-    /* If new data arrived. */
     while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART2))
     {
         uint8_t receivedByte = USART_ReadByte(WIFI_USART2);
         PRINTF("USART2 Rex`ceived: 0x%02X\n", receivedByte);
 
-        // Process received data as needed
-        // For now just print it
     }
 
     USART_ClearStatusFlags(WIFI_USART2, kUSART_RxError);
@@ -674,17 +571,11 @@ void syncReq(uint8_t *req_buffer)
 	size_t msg_len = 0;
 	int ret = 0;
 
-	// TODO: read previous timestamp (time_prev) and device ID (id_dev) from secure flash memory.
 
 	uint8_t time_prev[TIME_SIZE] = {0, };
 	memcpy(time_prev, &time_prev_int, TIME_SIZE);
 
-	// old syncReq msg: [n1_dev(32) || time_prev(4) || id_dev(4) || signature(variable) || "MSGEND"(6)]
-	// syncReq msg: [id_dev(4) || n1_dev(32) || time_prev(4) || signature(variable) || "MSGEND"(6)]
-	// The last 6 bytes, "MSGEND" is for the network module to differentiate this from syncAck.
-
 	ret = mbedtls_ctr_drbg_random(&ctr_drbg, n1_dev, sizeof(n1_dev));
-	//memcpy(last_sent_nonce, n_dev, NONCE_SIZE);
 	memcpy(req_buffer+msg_len, &id_dev, ID_SIZE);
 	msg_len += ID_SIZE;
 	memcpy(req_buffer+msg_len, n1_dev, NONCE_SIZE);
@@ -714,7 +605,6 @@ void cmp_ts_and_save(const uint8_t *time_prev, const uint8_t *time_cur)
 
 	if (time_prev_int > time_prev_cur) {while(1);}
 
-	// TODO: save it to the flash memory
 	s_MsCount = 0;
 	adjustedSyncTime = time_prev_cur;
 }
@@ -727,16 +617,10 @@ void syncResp(uint8_t *req_buffer, uint8_t *resp_buffer)
 	uint8_t digest[HASH_SIZE] = {0, };
 	int ret = 0;
 
-	// syncReq msg: [id_dev(4) || n1_dev(32) || time_prev(4) || signature(variable) || "MSGEND"(6)]
-	// resp_buffer: [n1_dev(32) || n1_m_srv(32) || time_cur(4) from m_srv || signature(variable)]
-	// syncResp msg: [id_dev(4) || n1_dev(32) || n1_m_srv(32) || time_cur(4) from m_srv || signature(variable)]
-
-
 	USART_ReadBlocking(WIFI_USART, (uint8_t*)&msg_len, sizeof(msg_len));
 
 	USART_ReadBlocking(WIFI_USART, resp_buffer, msg_len);
 
-	// If the received id_dev and n1_dev are not the same as the ones sent to the server
 	ret = memcmp(req_buffer, resp_buffer, ID_SIZE+NONCE_SIZE);
 	if(ret != 0){while(1);}
 
@@ -764,11 +648,6 @@ void syncAck(const uint8_t *resp_buffer)
 	uint8_t n2_dev[NONCE_SIZE] = {0, };
 	uint8_t ack_buffer[BUF_SIZE] = {0, };
 	int ret = 0;
-
-	// old ack_buffer: [n2_dev(32) || time_cur(4) from m_srv || signature(variable) || "ACKEND"(6)]
-	// ack_buffer: [id_dev(4) || n2_dev(32) || n1_m_srv(32) || time_cur(4) from m_srv || signature(variable) || "ACKEND"(6)]
-	// The last 6 bytes, "ACKEND" is for the network module to differentiate this from syncReq.
-
 
 	ret = mbedtls_ctr_drbg_random(&ctr_drbg, n2_dev, sizeof(n2_dev));
 
@@ -801,7 +680,6 @@ void syncAck(const uint8_t *resp_buffer)
 	PRINTF("\r\n");
 
 	USART_WriteBlocking(WIFI_USART, ack_buffer, msg_len);
-   // USART_WriteBlocking(WIFI_USART2, ack_buffer, msg_len);
 
 
 }
@@ -837,8 +715,6 @@ static unsigned long saddr = 0x40000;	/* Start of FLASH 1 with NS-User privilege
 
 uint8_t attest()
 {
-	// It is assumed that the hash of expected result would be stored in the secure flash memory
-	// Given digest is hashed value of address 0x40000 with the size of 0x10000
 	uint8_t expected_digest[HASH_SIZE] = { 0x4B, 0x95, 0x99, 0x39, 0xC0, 0xD7, 0xF5, 0x0A,
 			0x34, 0xF2, 0xA5, 0xDB, 0x50, 0x66, 0x24, 0x22,
 			0x75, 0x74, 0x60, 0x5C, 0x09, 0xB8, 0xE1, 0x3E,
@@ -851,10 +727,6 @@ uint8_t attest()
 		__sha256((uint8_t *)saddr+i*MEM_SIZE_4K, MEM_SIZE_4K, digest_hash_chain+i*HASH_SIZE);
 	}
 	__sha256(digest_hash_chain, sizeof(digest_hash_chain), digest);
-
-
-//	if (memcmp(expected_digest, digest, HASH_SIZE) != 0)
-//		return 1;
 
 	return 0;
 }
@@ -877,7 +749,6 @@ void announcement()
 	static uint8_t attest_count = 0;
 	uint32_t cycles_before, cycles_after = 0;
 
-	// run attestation in every PACKET_SEND_TIMER*ATTESTATION_TIMER seconds
 	if ( (++attest_count % ATTESTATION_TIMER == 0) || !time_attest ) {
 		attest_count = 0;
 		time_attest = curTs;
@@ -894,11 +765,6 @@ void announcement()
 		PRINTF("[Attestation] Cycle consumed: %u cycles\n\r", cycles_after - cycles_before);
 #endif
 	}
-
-	// Announce procedure
-
-	// msg: [n_dev(32) || curTS(4) || signature(variable) || M_SRV_URL(22) || m_srv_url_len(1) || attest_result(1) || time_attest(4)]
-	// signature: [n_dev(32) || time_cur (4) from Dev || id_dev(4) || H(M_SRV_URL)(32) || attest_result(1) || time_attest(4)]
 
 	ret = mbedtls_ctr_drbg_random(&ctr_drbg, n_dev, NONCE_SIZE);
 	memcpy(previous_sent_nonce, last_sent_nonce, NONCE_SIZE);
@@ -955,37 +821,30 @@ void announcement()
 
 	PRINTF("\r\n=== Message Components Breakdown ===\r\n");
 
-		// Print n_dev (32 bytes)
 		PRINTF("n_dev (32 bytes): ");
 		for(int i = 0; i < NONCE_SIZE; i++) {
 		    PRINTF("%02X ", msg[i]);
 		}
 		PRINTF("\r\n");
 
-		// Print curTS (4 bytes)
 		PRINTF("curTS (4 bytes): ");
 		for(int i = NONCE_SIZE; i < NONCE_SIZE + TIME_SIZE; i++) {
 		    PRINTF("%02X ", msg[i]);
 		}
 		PRINTF(" (Decimal: %u)\r\n", curTs);
 
-		// Print signature (variable length)
 		PRINTF("signature (variable length): ");
 		for(int i = NONCE_SIZE + TIME_SIZE; i < msg_len - m_srv_url_len - sizeof(m_srv_url_len) - ATT_SIZE - TIME_SIZE; i++) {
 		    PRINTF("%02X ", msg[i]);
 		}
 		PRINTF("\r\n");
 
-		// Print M_SRV_URL
 		PRINTF("M_SRV_URL (%d bytes): %s\r\n", m_srv_url_len, M_SRV_URL);
 
-		// Print m_srv_url_len (1 byte)
 		PRINTF("m_srv_url_len (1 byte): %02X (Decimal: %u)\r\n", m_srv_url_len, m_srv_url_len);
 
-		// Print attest_result (1 byte)
 		PRINTF("attest_result (1 byte): %02X\r\n", attest_result[0]);
 
-		// Print time_attest (4 bytes)
 		PRINTF("time_attest (4 bytes): ");
 		uint32_t time_att_offset = msg_len - TIME_SIZE;
 		for(int i = time_att_offset; i < msg_len; i++) {
@@ -1010,7 +869,6 @@ void announcement()
 		PRINTF("\r\n");
 
 	USART_WriteBlocking(WIFI_USART, msg, msg_len);
-    //USART_WriteBlocking(WIFI_USART2, msg, msg_len);
 
 }
 
@@ -1134,24 +992,24 @@ int main(void)
 								10);
 	if(ret != 0){while(1);}
 
-	DisableIRQ(WIFI_USART_IRQn);    // Disable USART interrupt
-	DisableIRQ(WIFI_USART2_IRQn);   // Disable USART2 interrupt
+	DisableIRQ(WIFI_USART_IRQn);    
+	DisableIRQ(WIFI_USART2_IRQn);   
 
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[0] = DWT->CYCCNT;
 #endif
-	syncReq(req_buffer);
+	//syncReq(req_buffer);
 	PRINTF("sync req \n\r");
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[1] = DWT->CYCCNT;
 #endif
-	syncResp(req_buffer, resp_buffer);
+	//syncResp(req_buffer, resp_buffer);
 	PRINTF("sync resp \n\r");
 #ifdef PERFORMANCE_EVALUATION
 	cycle_records[2] = DWT->CYCCNT;
 #endif
 
-	syncAck(resp_buffer);
+	//syncAck(resp_buffer);
 	PRINTF("sync ack \n\r");
 	EnableIRQ(WIFI_USART_IRQn);     // Re-enable USART interrupt
 	EnableIRQ(WIFI_USART2_IRQn);    // Re-enable USART2 interrupt
