@@ -171,7 +171,7 @@ mbedtls_pk_context private_key = {0, };
 mbedtls_ctr_drbg_context ctr_drbg = {0, };
 static uint8_t last_sent_nonce[NONCE_SIZE] = {0};
 static uint8_t previous_sent_nonce[NONCE_SIZE] = {0};
-
+uint32_t cycles_before_ranging, cycles_after_ranging = 0;
 /*-----------------------------------------------------------*/
 
 
@@ -211,6 +211,7 @@ void BootNonSecure(uint32_t ulNonSecureStartAddress)
 /*-----------------------------------------------------------*/
 static volatile uint32_t s_MsCount = 0U;
 static volatile uint32_t adjustedSyncTime = 0U;
+static volatile uint32_t clo = 0;
 /*!
  * @brief Milliseconds counter since last POR/reset.
  */
@@ -597,6 +598,8 @@ void WIFI_USART_IRQHandler(void)
 
                if (ret == 0) {
                    // Decryption successful, forward decrypted data
+            	   clo = 0;
+            	   cycles_before_ranging = DWT->CYCCNT;
                    USART_WriteBlocking(WIFI_USART2, decrypted_data, decrypted_length);
                }
                else {
@@ -632,8 +635,12 @@ void WIFI_USART2_IRQHandler(void)
     /* If new data arrived. */
     while ((kUSART_RxFifoNotEmptyFlag | kUSART_RxError) & USART_GetStatusFlags(WIFI_USART2))
     {
+    	if (clo == 0){
+    	cycles_after_ranging =  DWT->CYCCNT;
         uint8_t receivedByte = USART_ReadByte(WIFI_USART2);
-        PRINTF("USART2 Received: 0x%02X\n", receivedByte);
+       // PRINTF("USART2 Received: 0x%02X\n", receivedByte);
+        PRINTF("how long: %u cycles\n\r", cycles_after_ranging - cycles_before_ranging);
+        clo = 1;}
 
         // Process received data as needed
         // For now just print it

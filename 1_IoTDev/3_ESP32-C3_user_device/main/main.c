@@ -983,17 +983,69 @@ void wifi_init_sta(void)
 }
 
 // Add this global buffer to store the complete response
+
+/*static const char manifest_data[] = 
+    "device_id:19682938\n"
+    "device_status:active\n"
+    "device_type:blinking led\n"
+    "sensors:null\n"
+    "actuators:led\n"
+    "network:wifi\n"
+    "purpose:null\n"
+    "manufacturer:paisa\n"
+    "full_specification_link:null\n"
+    "user_manual_link:null\n"
+    "location:null\n"
+    "description:sample application, blinking led\n"
+    "certificate_of_device:-----BEGIN CERTIFICATE-----\\nMIICMTCCAdegAwIBAgIUR6yKQMIFRnKjJ72bK+NlyO/aAiEwCgYIKoZIzj0EAwIw\\naDELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMRYwFAYDVQQHDA1TYW4gRnJhbmNp\\nc2NvMRUwEwYDVQQKDAxNYW51ZmFjdHVyZXIxHTAbBgNVBAMMFE1hbnVmYWN0dXJl\\nciBSb290IENBMB4XDTI1MDIxMjAwMDYxNFoXDTI2MDIxMjAwMDYxNFowYzELMAkG\\nA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFDASBgNVBAcMC0xvcyBBbmdl\\nbGVzMRUwEwYDVQQKDAxNYW51ZmFjdHVyZXIxEjAQBgNVBAMMCURldmljZSBDQTBZ\\nMBMGByqGSM49AgEGCCqGSM49AwEHA0IABNuZ+8knXJgADUK1CIJ05dHDHVMuH5Fj\\nlv3KAI9Gn9oeej73jO7KnjBq2kM65TYISDlNkN1nuR8mYYRMqcVCSCqjZDBiMAsG\\nA1UdDwQEAwIDiDATBgNVHSUEDDAKBggrBgEFBQcDATAdBgNVHQ4EFgQUUySu7/QH\\nMW9JsVZPybnlhQBmsTYwHwYDVR0jBBgwFoAUvzXYcaDKIdHxqF8Z0fgtkchI/ygw\\nCgYIKoZIzj0EAwIDSAAwRQIhAPN2rhdyM4+zwTDIKMNPrJ+Z0pNbdweZ6FXKsOnb\\nCrnqAiBOUl/rtXDcqlWYv3Tlzrwh571ilO7K70o0gjBf7bedOg==\\n-----END CERTIFICATE-----\\n\n"
+    "signature_of_manifest:MEYCIQCuVnwgawqvH2jfNsIF9cfugPvtYx2yIPfWotcEsbQ/LQIhAJZeV+YeHFGI3PBWagLH+IRK\\n5cBuJCCflGOAe4tRxcvS\n"
+    "certificate_of_manufacturer:-----BEGIN CERTIFICATE-----\\nMIICvjCCAmSgAwIBAgIUUmXPv5fqGFuzBl/Aqq2O9qyRTV8wCgYIKoZIzj0EAwIw\\naDELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMRYwFAYDVQQHDA1TYW4gRnJhbmNp\\nc2NvMRUwEwYDVQQKDAxNYW51ZmFjdHVyZXIxHTAbBgNVBAMMFE1hbnVmYWN0dXJl\\nciBSb290IENBMB4XDTI1MDIxMjAwMDYxNFoXDTI2MDIxMjAwMDYxNFowaDELMAkG\\nA1UEBhMCVVMxCzAJBgNVBAgMAkNBMRYwFAYDVQQHDA1TYW4gRnJhbmNpc2NvMRUw\\nEwYDVQQKDAxNYW51ZmFjdHVyZXIxHTAbBgNVBAMMFE1hbnVmYWN0dXJlciBSb290\\nIENBMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUoT5Ct1reTJanqFLf6NAm5Kt\\n6G8x4ngbrnjzTH1fDkQTr0eTDCJeoBPBxSP3kT3IJ8+7UZ/vBGKfYr/MuP6vYqOB\\n6zCB6DAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQU\\nvzXYcaDKIdHxqF8Z0fgtkchI/ygwgaUGA1UdIwSBnTCBmoAUvzXYcaDKIdHxqF8Z\\n0fgtkchI/yihbKRqMGgxCzAJBgNVBAYTAlVTMQswCQYDVQQIDAJDQTEWMBQGA1UE\\nBwwNU2FuIEZyYW5jaXNjbzEVMBMGA1UECgwMTWFudWZhY3R1cmVyMR0wGwYDVQQD\\nDBRNYW51ZmFjdHVyZXIgUm9vdCBDQYIUUmXPv5fqGFuzBl/Aqq2O9qyRTV8wCgYI\\nKoZIzj0EAwIDSAAwRQIhALNOGkm/tuZ/Fv+XoGutbZyBozp6nQY9y7DLkjdzEBs9\\nAiBEHqK6Z3F9wYAhJHBl9cOvAeBKVhhlhPf0+tMRjLIr5Q==\\n-----END CERTIFICATE-----\\n";
+*/
+
 static char response_buffer[4096];
 static int response_len = 0;
 
 static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 {
+    //response_len = sizeof(manifest_data) - 1; // -1 to exclude null terminator
+    
+    // Make sure response buffer is large enough
+  //  if (response_len < sizeof(response_buffer)) {
+        // Copy manifest data to response buffer
+    //    memcpy(response_buffer, manifest_data, response_len);
+    //    response_buffer[response_len] = '\0'; // Ensure null termination
+    //    ESP_LOGI(TAG, "Response buffer initialized with manifest data (%d bytes)", response_len);
+   // } else {
+    //    ESP_LOGE(TAG, "Manifest data too large for response buffer (%d > %d)", 
+              //  response_len, sizeof(response_buffer));
+   // }
+   // return ESP_OK;
+   static int64_t headers_sent_time = 0;
+
     switch (evt->event_id)
     {
+    case HTTP_EVENT_HEADERS_SENT:
+        // HTTP request headers have been sent
+        
+        headers_sent_time = esp_timer_get_time();
+
+        break;
     case HTTP_EVENT_ON_HEADER:
         // Reset buffer at the start of a new request
-        if (evt->header_key != NULL)
+      //  return ESP_FAIL;
+      if (headers_sent_time > 0) {
+     //   int64_t response_time = esp_timer_get_time() - headers_sent_time;
+     //   ESP_LOGI(TAG, "Server response time: %lld μs", response_time);
+        headers_sent_time = 0; // Reset for next time
+        //metrics.manifest_fetch_start = esp_timer_get_time();
+      //  metrics.url_extraction_start = esp_timer_get_time();
+    }
+   // metrics.manifest_fetch_start = esp_timer_get_time();
+   // metrics.url_extraction_start = esp_timer_get_time();
+
+       if (evt->header_key != NULL)
         {
+           
             response_len = 0;
             memset(response_buffer, 0, sizeof(response_buffer));
         }
@@ -1001,16 +1053,29 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 
     case HTTP_EVENT_ON_DATA:
         // Prevent buffer overflow and duplicates
-        if (response_len + evt->data_len < sizeof(response_buffer))
+       // return ESP_FAIL;
+       
+        const size_t remaining = sizeof(response_buffer) - response_len - 1;
+        const size_t to_copy = (evt->data_len < remaining) ? evt->data_len : remaining;
+      //  ESP_LOGI(TAG, "POOPOOP");
+        if (to_copy > 0) {
+            // Use direct memory copy for speed (avoid strlen calculations)
+            memcpy(response_buffer + response_len, evt->data, to_copy);
+            response_len += to_copy;
+            response_buffer[response_len] = 0; // Ensure null termination
+        }
+
+        /*if (response_len + evt->data_len < sizeof(response_buffer))
         {
             memcpy(response_buffer + response_len, evt->data, evt->data_len);
             response_len += evt->data_len;
             response_buffer[response_len] = 0; // Null terminate
-        }
+        }*/
         break;
 
     case HTTP_EVENT_ON_FINISH:
         // Ensure buffer is null-terminated
+       // return ESP_FAIL;
         if (response_len < sizeof(response_buffer))
         {
             response_buffer[response_len] = 0;
@@ -1018,12 +1083,14 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
         break;
 
     case HTTP_EVENT_ERROR:
+   // return ESP_FAIL;
         // Clear buffer on error
         response_len = 0;
         memset(response_buffer, 0, sizeof(response_buffer));
         break;
 
     default:
+    //return ESP_FAIL;
         break;
     }
     return ESP_OK;
@@ -1195,27 +1262,36 @@ void extract_public_key()
 void display_paisa_info(const char *url)
 {
     ESP_LOGI(TAG, "Device URL: %s", url);
-    metrics.manifest_fetch_start = esp_timer_get_time();
+    
 
     esp_http_client_config_t config = {
-        .host = "drive.usercontent.google.com",
-        .path = "/uc?id=1H2cCloHdzEVRY0KFEY_1OIBR0W87Iq1l&export=download",
+       // https://gist.githubusercontent.com/y76/1017026428a1b2b5dee043d73bf943a3/raw/3950dc3d5eb2ba06da968ab08e21f1e1c2cf0b91/gistfile1.txt
+        //.host = "drive.usercontent.google.com",
+        .host = "gist.githubusercontent.com",
+        .path = "/y76/1017026428a1b2b5dee043d73bf943a3/raw/3950dc3d5eb2ba06da968ab08e21f1e1c2cf0b91/gistfile1.txt",
+        //.path = "/uc?id=1H2cCloHdzEVRY0KFEY_1OIBR0W87Iq1l&export=download",
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .cert_pem = NULL,
         .skip_cert_common_name_check = true,
-        .timeout_ms = 10000,
-        .max_redirection_count = 5,
+        .crt_bundle_attach = esp_crt_bundle_attach, // Use the ESP certificate bundle
+        .timeout_ms = 5000,
+        .max_redirection_count = 3,
         .user_agent = "Mozilla/5.0",
         .event_handler = http_event_handler,
+        .keep_alive_enable = true,
+        .buffer_size = 4096,           // Increased buffer size for faster data handling
+        .buffer_size_tx = 4096,        // Optimized TX buffer
+     //   .is_async = true,              // Enable async mode
     };
-
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client == NULL)
     {
         ESP_LOGE(TAG, "Failed to initialize HTTP client");
         return;
     }
-
+    
+    metrics.manifest_fetch_start = esp_timer_get_time();
+    //metrics.url_extraction_start = esp_timer_get_time();
     esp_err_t err = esp_http_client_perform(client);
     metrics.manifest_fetch_end = esp_timer_get_time();
     metrics.manifest_fetch_time = metrics.manifest_fetch_end - metrics.manifest_fetch_start;
@@ -1346,6 +1422,7 @@ static void extract_and_display_url(const uint8_t *data, uint8_t length)
             size_t url_length = remaining_length < sizeof(url_buffer) ? remaining_length : sizeof(url_buffer) - 1;
             memcpy(url_buffer, &data[i], url_length);
             url_buffer[url_length] = '\0';
+            metrics.url_extraction_end = esp_timer_get_time();
 
             display_paisa_info(url_buffer);
             break;
@@ -1481,6 +1558,7 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
         goto cleanup;
     }
 
+
     // Parse peer's public key from PEM
     ret = mbedtls_pk_parse_public_key(&peer_pk, (const unsigned char *)public_key_pem,
                                       strlen(public_key_pem) + 1);
@@ -1502,6 +1580,8 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
         ESP_LOGE(TAG, "Failed to compute shared secret: -0x%x", -ret);
         goto cleanup;
     }
+    metrics.shared_secret_gen_end = esp_timer_get_time();
+    metrics.shared_secret_gen_time = metrics.shared_secret_gen_end - metrics.shared_secret_gen_start;
 
     // Use shared secret for AES-GCM encryption
     // uint8_t shared_secret[32];
@@ -1517,7 +1597,7 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
     mbedtls_gcm_context gcm;
     // uint8_t iv[12] = {0}; // In production, use random IV
     // uint8_t tag[16];
-
+    metrics.sts_encrypt_start = esp_timer_get_time();
     mbedtls_gcm_init(&gcm);
     ret = mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, shared_secret, 256);
     if (ret != 0)
@@ -1594,16 +1674,16 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
     memcpy(tag, encrypted_data + data_len, 16);
 
     // Decrypt using only the encrypted portion
-    ret = mbedtls_gcm_auth_decrypt(&gcm, data_len,
-                                   iv, sizeof(iv),
-                                   NULL, 0,
-                                   tag, 16,
-                                   encrypted_data, // Just the encrypted portion
-                                   decrypted);
+   // ret = mbedtls_gcm_auth_decrypt(&gcm, data_len,
+   //                                iv, sizeof(iv),
+   //                                NULL, 0,
+   //                                tag, 16,
+   //                                encrypted_data, // Just the encrypted portion
+   ////                                decrypted);
 
-    if (ret == 0)
-    {
-        ESP_LOGI(TAG, "Decryption successful");
+  //  if (ret == 0)
+  //  {
+   //     ESP_LOGI(TAG, "Decryption successful");
      //   ESP_LOGI(TAG, "Decrypted text: ");
      //   for (int i = 0; i < data_len; i++)
      //   {
@@ -1617,11 +1697,11 @@ static int encrypt_with_public_key(const uint8_t *data, size_t data_len,
      //       printf("%02x", decrypted[i]);
       //  }
       //  printf("\n");
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Decryption failed: -0x%x", -ret);
-    }
+  //  }
+   // else
+   // {
+   //     ESP_LOGE(TAG, "Decryption failed: -0x%x", -ret);
+    //}
 
 cleanup_gcm:
     mbedtls_gcm_free(&gcm);
@@ -1882,6 +1962,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
             // CHECK TIMESTAMP FRESHNESS
             if (!is_timestamp_valid(debug_disc->data))
             {
+                ble_scanner_init();
                 return 0; // Exit the event handler
             }
 
@@ -1904,10 +1985,11 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
             // TODO
             // VERIFY MSGANNO SIGNATURE USING PKIDEV
             metrics.url_extraction_start = esp_timer_get_time();
+          
                         // PRINT OUT PAISA INFORMATION
             extract_and_display_url(debug_disc->data, total_length);
 
-            metrics.url_extraction_end = esp_timer_get_time();
+            //metrics.url_extraction_end = esp_timer_get_time();
             metrics.url_extraction_time = metrics.url_extraction_end - metrics.url_extraction_start;
             ESP_LOGI(TAG, "URL extraction time: %lld μs", metrics.url_extraction_time);
 
@@ -2010,7 +2092,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 // memcpy(crypto_data + sizeof(sts_key) + sizeof(sts_iv), &aes_key, sizeof(aes_key));
                 // send_uart_data(crypto_data, sizeof(crypto_data));
 
-                metrics.sts_encrypt_start = esp_timer_get_time();
+                
 
 
                 uint8_t crypto_data[36]; // 16 (STS key) + 16 (STS IV) + 2 (src_addr) + 2 (dst_addr)
@@ -2049,8 +2131,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                                                   iv);              // Pass buffer for IV
 
 
-                                                  metrics.shared_secret_gen_end = esp_timer_get_time();
-                                                  metrics.shared_secret_gen_time = metrics.shared_secret_gen_end - metrics.shared_secret_gen_start;
+                                                 
                                                   
                                                   // End STS encryption time measurement
                                                   metrics.sts_encrypt_end = esp_timer_get_time();

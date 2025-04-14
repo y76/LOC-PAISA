@@ -461,7 +461,8 @@ int ss_twr_responder_sts(void)
                     /* Write all timestamps in the final message. See NOTE 8 below. */
                     resp_msg_set_ts(&tx_resp_msg[RESP_MSG_POLL_RX_TS_IDX], poll_rx_ts);
                     resp_msg_set_ts(&tx_resp_msg[RESP_MSG_RESP_TX_TS_IDX], resp_tx_ts);
-
+                     uint8_t tx_byte = 'b';
+                    nrf_drv_uart_tx(&uart_instance, &tx_byte, 1);
                     /* Write and send the response message. See NOTE 9 below. */
                     tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
                     dwt_writesysstatuslo(DWT_INT_TXFRS_BIT_MASK);
