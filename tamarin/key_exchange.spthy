@@ -1,0 +1,72 @@
+theory key_exchange
+begin
+
+builtins: diffie-hellman, symmetric-encryption, signing
+
+equations: 
+  sdec(senc(m, k), k) = m
+
+rule Register_pk:
+  [ Fr(~ltk_Idev) ]
+  -->
+  [ !Ltk($Idev, ~ltk_Idev)
+    , !Pk($Idev, pk(~ltk_Idev))
+  ]
+
+rule Udev_Generate_Ephemeral_Key_Pair:
+  [ Fr(~ephSk_Udev) ]
+  --[ GenerateEphemeralKeyPair($Udev) ]->
+  [ !EphemeralPrivateKey($Udev, ~ephSk_Udev),
+    !EphemeralPublicKey($Udev, 'g'^~ephSk_Udev),
+    Out('g'^~ephSk_Udev) ]
+
+rule Udev_Compute_Shared_Secret:
+    let ss = pk_Idev^ephSk_Udev
+    in
+  [ !EphemeralPrivateKey($Udev, ephSk_Udev),
+    In(pk_Idev) ] 
+  --[ ComputeSharedSecret($Udev, $Idev) ]->
+  [ !SharedSecret($Udev, $Idev, ss) ]
+
+rule Idev_Compute_Shared_Secret:
+    let ss = ephPk_Udev^ltk_Idev
+    in
+  [ !Ltk($Idev, ltk_Idev),
+    In(ephPk_Udev) ] 
+  --[ ComputeSharedSecret($Idev, $Udev) ]->
+  [ !SharedSecret($Idev, $Udev, ss) ]
+
+rule Udev_Encrypt_And_Send_Message:
+  [ !SharedSecret($Udev, $Idev, ss),
+    Fr(~sts_params),
+    !EphemeralPublicKey($Udev, ephPk_Udev) ]
+  --[ EncryptAndSendMessage($Udev, senc(~sts_params, ss), ephPk_Udev) ]->
+  [ Out(<senc(~sts_params, ss), ephPk_Udev>) ]
+
+rule Idev_Decrypt_Encrypted_Key:
+  [ !SharedSecret($Udev, $Idev, ss),
+    !SharedSecret($Idev, $Udev, ss),
+    In(<senc(sts_key, ss), ephPk_Udev>) ] 
+  --[ DecryptEncryptedKey($Idev, sts_key) ]->
+  [ DecryptedMessage(sdec(sts_key,ss)) ]
+
+lemma full_trace_executable:
+  exists-trace
+    "Ex Udev Idev sts_params ss ephPk_Udev #encrypt #compute_shared_u #compute_shared_i #decrypt.
+
+     EncryptAndSendMessage(Udev, senc(sts_params, ss), ephPk_Udev) @ #encrypt &
+     ComputeSharedSecret(Udev, Idev) @ #compute_shared_u &
+     ComputeSharedSecret(Idev, Udev) @ #compute_shared_i &
+     DecryptEncryptedKey(Idev, sts_params) @ #decrypt &
+     
+     // ordering
+     #encrypt < #compute_shared_u &
+     #compute_shared_u < #compute_shared_i &
+     #compute_shared_i < #decrypt"
+
+lemma sts_params_confidentiality:
+  "All sts_params ss #i.
+      Out(senc(sts_params, ss)) @ #i ==> 
+      not (Ex #j. K(ss) @ #j)"
+
+end

@@ -1,0 +1,57 @@
+theory message_announcement_signature_verification
+begin
+
+builtins: signing
+
+rule Register_pk:
+  [ Fr(~ltk_Idev) ]
+  -->
+  [ !Ltk($Idev, ~ltk_Idev)
+  , !Pk($Idev, pk(~ltk_Idev))
+  ] 
+
+rule Reveal_ltk:
+  [ !Ltk(Idev, ltk_Idev) ] --[ Reveal(Idev) ]-> [ Out(ltk_Idev) ]
+
+rule Idev_message_announcement:
+  let m = <Idev, devmanifest, ~nonce> 
+  in 
+  [ Fr(~nonce)
+  , Fr(devmanifest)
+  , !Ltk(Idev, ltk_Idev)
+  ]
+--[ Send(Idev, m) 
+  ]->
+  [ Out(<m, sign(m, ltk_Idev), pk(ltk_Idev)>) ]
+
+rule Udev_receive_message_announcement:
+  [ 
+    !Pk(Idev, pk_Idev)
+  , In(<m, sig>)
+  ]
+--[ Recv($Udev, m)
+  , Eq(verify(sig, m, pk_Idev), true) 
+  , Authentic(Idev, m), Honest($Udev), Honest(Idev)
+  , Verified($Udev, m, sig, pk_Idev)
+  ]->
+  [ ]
+
+restriction Equality:
+  "All x y #i. Eq(x,y) @i ==> x = y"
+
+lemma executable:
+  exists-trace
+    "Ex Idev Udev m #i #j. Send(Idev,m)@i & Recv(Udev,m) @j"
+
+lemma message_authentication:
+    "All Idev Udev m #i.
+      (Recv(Udev, m) @i & Authentic(Idev, m) @i)
+      ==> (Ex #j. Send(Idev, m) @j & j < i)
+          | (Ex Idev #r. Reveal(Idev) @r & r < i)"
+
+lemma unforgeability:
+    "All Idev Udev m sig #i.
+    Recv(Udev, m) @i & Verified(Udev, m, sig, pk(Idev)) @i & Honest(Idev) @i
+    ==> (Ex #j. Send(Idev, m) @j & j < i)"
+
+end
