@@ -1,187 +1,153 @@
 # LOCO: Secure Localization and Awareness of Ambient IoT Devices
 
-**[THIS REPOSITORY IS UNDER CONSTRUCTION]**
+## Repository Structure
 
+```
+LOCO
+├── 1_IoTDev
+│   ├── 1_NXPBoard
+│   ├── 2_ESP32-C3
+│   └── 3_ESP32-C3_user_device
+├── 2_ManufacturerServer
+├── IoT_uwb
+│   └── Drivers/API/Build_Platforms/nRF52840-DK/IoT_Uwb.emProject
+├── user_uwb
+│   └── Drivers/API/Build_Platforms/nRF52840-DK/user_uwb.emProject
+├── keys
+└── tamarin
+```
 
-## LOCO Directory Structure
-## TODO
-    LOCO
-    ├── 1_IoTDev
-    │   ├── 1_NXPBoard
-    │   │   ├── freertos_blinky_ns
-    │   │   │   ├── drivers
-    │   │   │   ├── freertos
-    │   │   │   ├── nsc_functions
-    │   │   │   ├── source
-    │   │   │   └── startup
-    │   │   └── freertos_blinky_s
-    │   │       ├── include
-    │   │       ├── drivers
-    │   │       ├── mbedtls
-    │   │       ├── nsc_functions
-    │   │       ├── source
-    │   │       └── startup
-    │   └── 2_ESP32-C3
-    │       └── main
-    ├── 2_ManufacturerServer
-    │   └── keys
-    └── 3_AndroidPhone/
-        └── app
-            └── src
-                └── main
-                    ├── java
-                    │   └── com
-                    │       └── sprout
-                    │           └── paisa
-                    └── res
-                         └── layout
+## Hardware Requirements
 
-## Hardware and Software Requirement
+The LOCO implementation has three components: an IoT device (𝐼𝑑𝑒𝑣), a user device (𝑈𝑑𝑒𝑣), and a manufacturer server (𝑀𝑠𝑣𝑟).
 
+### IoT Device (𝐼𝑑𝑒𝑣)
+- [NXP LPC55S69-EVK](https://www.nxp.com/design/software/development-software/mcuxpresso-software-and-tools-/lpcxpresso-boards/lpcxpresso55s69-development-board:LPC55S69-EVK) development board (based on ARM Cortex-M33 with TrustZone-M)
+  - Runs at 150MHz with 640KB flash and 320KB SRAM
+- [Quorvo QM33120WDK1](https://www.qorvo.com/products/p/QM33120) single-antenna UWB development board
+  - Connected via UART2
+- [ESP32-C3-DevKitC-02](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/hw-reference/esp32c3/user-guide-devkitc-02.html) Bluetooth board
+  - Connected via UART4
 
-### Hardware Requirement
+### User Device (𝑈𝑑𝑒𝑣)
+- Dual-antenna variant of [Quorvo QM33120WDK1](https://www.qorvo.com/products/p/QM33120)
+  - Enables accurate PDoA-based AoA measurements beyond standard distance ranging
+- [ESP32-C3-DevKitC-02](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/hw-reference/esp32c3/user-guide-devkitc-02.html)
+  - Provides WiFi and Bluetooth connectivity
 
-## TODO
+### Manufacturer Server (𝑀𝑠𝑣𝑟)
+- Implementation Environment:
+  - Ubuntu 20.04 LTS
+  - Intel i5-11400 processor running at 2.6GHz
+  - 16GB RAM
 
-#### IoT Device
-1. [NXP LPC55S69 board](https://www.nxp.com/design/software/development-software/mcuxpresso-software-and-tools-/lpcxpresso-boards/lpcxpresso55s69-development-board:LPC55S69-EVK) (based on Cortex-M33 equiped with Trustzone-M)
-2. [ESP32-C3-DevKitC-02](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/hw-reference/esp32c3/user-guide-devkitc-02.html)
+## Software Requirements
 
-
-
-<p align="center">
-  <img src="./4_Others/board_config.jpg" width=70%, alt="PAISA IoT board configuration">
-</p>
-<p align = "center">
-<b>Figure 1 -  hardware connection between NXP board and ESP board</b>
-</p>
-
-The NXP board (big) is wired with the ESP board (small). UART4 on the NXP board is connected to UART 1 on the ESP board. Each board is powered individually.
-
-#### Manufacturer Server (<i>mfr</i>)
-Environment (processor and OS) used for development emulating PAISA Manufacturer Server:
-11th Gen Intel® Core™ i5-11400 @ 2.60GHz × 12, Ubuntu 22.04.2 LTS.
-
-#### User Device
-We used the below  for emulating  user device.
-1. [Google Pixel 6](https://store.google.com/intl/en/ideas/articles/google-pixel-6-features/), running on Android 12 (API Level: 32)
-2. [BLU View 1](https://store.google.com/intl/en/ideas/articles/google-pixel-6-features/), running on Android 9 (API Level: 28)
-
-### Software Requirement
-Each device, except for <i>mfr</i>, requires SDK and development tool for the development.
-
-#### NXP Board
+### NXP Board
 1. IDE: [MCUXpresso IDE v11.6.1](https://www.nxp.com/design/software/development-software/mcuxpresso-software-and-tools-/mcuxpresso-integrated-development-environment-ide:MCUXpresso-IDE) (released on 2022-10-03)
 2. SDK: v2.12.0 (released 2022-07-14)
 
-SDK can be built using [MCUXpresso SDK Builder](https://mcuxpresso.nxp.com/en/welcome), or it can be downloaded via MCUXpresso IDE. 
-Note that the PAISA implementation on the NXP board is based on the secure_gpio example, provided by NXP.
+SDK can be built using [MCUXpresso SDK Builder](https://mcuxpresso.nxp.com/en/welcome), or it can be downloaded via MCUXpresso IDE.
+Note that the LOCO implementation on the NXP board is based on the secure_gpio example, provided by NXP.
 
-##### Secure Configuration (Trustzone-M)
-The following peripherals, memory regions (flash and RAM), interrupts are configured as secure:
+#### Secure Configuration (TrustZone-M)
+The following peripherals, memory regions (flash and RAM), and interrupts are configured as secure:
 - Peripherals
-    - CTimer2 - a secure timer
-    - FlexComm4 - a secure network peripheral for UART4
-    - HashCrypt - a hardware accelerator for SHA256
-    - Casper - a hardware accelerator for ECDSA schemes
+  - CTimer2 - a secure timer for triggering announcements
+  - FlexComm4 - a secure network peripheral for UART4
+  - FlexComm2 - a secure network peripheral for UART2
+  - HashCrypt - a hardware accelerator for SHA256
+  - Casper - a hardware accelerator for ECDSA schemes
 - Memory
-    - RAM - 0x3000_0000 ~ 0x3002_FFFF, 192KB
-    - Flash - 0x1000_0000 ~ 0x1003_FDFF, 260KB
+  - RAM - 0x3000_0000 ~ 0x3002_FFFF, 192KB
+  - Flash - 0x1000_0000 ~ 0x1003_FDFF, 260KB
 - Interrupt
-    - CTimer2
-    - FlexComm4
+  - CTimer2
+  - FlexComm4
 
 For more details about how to use IDE, please refer to [MCUXpresso IDE User Guide](https://community.nxp.com/pwmxy87654/attachments/pwmxy87654/Layerscape/4742/1/MCUXpresso_IDE_User_Guide.pdf).
 
-#### ESP Board
-The details about the ESP board is described [here](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/hw-reference/esp32c3/user-guide-devkitc-02.html).
-- IDE: [VSCode Extension](https://github.com/espressif/vscode-esp-idf-extension/blob/master/docs/tutorial/install.mdhttps://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/index.html#get-started-step-by-step), v1.6.1
-
-
-#### Manufacturer Server (<i>mfr</i>)
-<i>mfr</i> does not have any dependencies with IDEs since it is written in Python 3.
-The implementation has done with Python 3.10.6, and dependencies on Python are:
-
-        python3 -m pip install python-mbedtls
-
-
-#### User Device
-Android phones are used for the implementation.
-
-1. IDE: [Android Studio Electric Eel](https://developer.android.com/studio?gclid=Cj0KCQjwr82iBhCuARIsAO0EAZx86tt-PH0sm_VldmFgYjICExtL7QzRwLnZ7EHE4Xl-7W_frNJbqMIaAjfeEALw_wcB&gclsrc=aw.ds), built on January 20, 2023.
-2. SDK: API 33 (Android 13.0, Tiramisu)
-
-
-## Building/running  binaries on each device
-#### NXP Board
-The project for the NXP board is composed of two projects, freertos_blinky_ns for Normal world (non-secure) and freertos_blinky_s for Secure world. 
-To build binaries running on each world, click each project and click the button, build, in the following way:
-
-1. binary for Normal world
-        a. Click freertos_blinky_ns project.
-        b. Click 'build' botton in Quickstart pannel located in bottom left, or click 'Project' tab - 'Build Project'.
-        c. Click 'LS' on the left of 'Debug your project' in Quickstart pannel, and click 'attach to a running target using LinkServer'.
-
-2. binary for Secure World
-        a. Click freertos_blinky_s project.
-        b. Click 'build' botton in Quickstart pannel located in bottom left, or click 'Project' tab - 'Build Project'.
-        c. Click Debug on 'Debug your project' in Quickstart pannel, or click 
-        d. If SWD Configuration popped up, just choose 'Device 0' and click 'OK' button.
-        e. The device will be stopped at the first line of main function for the sake of Debugging. You can execute each line of code by clicking 'Step Into' (F5) or 'Step Over' (F6), or just run the code by clicking 'Resume' (F8).
-
-
-Just make sure that the NXP board is powered from your laptop/desktop. (Check if /dev/ttyACMx is present in the case of Ubuntu.)
-
-**Important Note**
-To run the code on the NXP board successfully, there are a couple of things to be done in advance as follows:
-* The NXP board should be wired with the ESP board correctly.
-* The ESP board is powered and runs with PAISA firmware of the ESP board.
-* <i>mfr</i> runs PAISA software for it. 
-
-#### ESP Board
-Assuming that VSCode is used with the Espressif IDF extension, execute VSCode on the ESP source code, 1_IoTDev/2_ESP32-C3.
-Command Palette ('View'-'Command Palette', or just press ctrl+shift+p) is used for the commands below in order:
-1. ESP-IDF:Select port to use (COM, tty, usbserial)
-        a. Click the port for the ESP Board (typically, /dev/ttyUSB* in Ubuntu)
-        b. Click the directory containing the ESP source code.
-2. ESP-IDF:Set Espressif Device Target
-        a. Click the directory containing the ESP source code.
-        b. Click 'esp32c3'
-        c. Click 'ESP32-C3 chip (via ESP-PROG)'
-3. ESP-IDF:SDK Configuration editor (menuconfig)
-        a. Just to confirm the UART setting. (port number:1, communication speed:115200, RXD pin:7, TXD pin:6)
-4. ESP-IDF: Build your project
-5. ESP-IDF: Flash your project
-
-Make sure that the ESP board is powered from your laptop/desktop before going through the above steps.
-
-#### Manufacturer Server (<i>mfr</i>)
-To run <i>mfr</i>  software, type the command as below:
-
-        python3 2_ManufacturerServer/ttp_time_srv.py
-
-If error occurs due to the address already in use, you may want to figure out if the software is already running; otherwise, you need to change to port number from 10000 to available port number on the file.
-
-#### User Device
-We believe any Android phones running on Android Pie or later can be used for the user device, but 'Google Pixel 6' and 'BLU View 1' are verified in our implementation.
-
-Developer options should be enabled to download the app from Android Studio directly. Also, USB debugging option is required.
-
-In Android Studio, the Android phone connected to your laptop/desktop appears to 'Device Manager' - 'Physical'. Then follows the next steps:
-1. Click the botton, located at top center, to choose your device to connect.
-2. Click the botton next to the botton in step 1 to run the code to the chosen device.
-3. After the app run on the phone, click 'SCAN PAISA DEVICE' button to start scanning the -enabled IoT devices.
-4. If the app is executed first time after it is installed, it asks the location permission. The location permissions appeared on the phone can vary depending on Android version, but it is safe to choose 'Precise' location permission. (Relying on Android version, the pop up only shows 'Precise' permission)
-5. All results will appear as depicted in the below figures.
-
-
-<p align="center">
-  <img src="./4_Others/phone_permission.png" width=20%, alt=" Android app to ask permissions" caption="hi">
-  <img src="./4_Others/phone_results.png" width=20%, alt=" Android app to show the results">
-</p>
-<p align = "center">
-<b>Figure 2 -  Android app</b>
-</p>
+### ESP32-C3 Boards
+- IDE: [VSCode Extension](https://github.com/espressif/vscode-esp-idf-extension/blob/master/docs/tutorial/install.md)
+  - Espressif IDF extension
 
 
 
+### Manufacturer Server (𝑀𝑠𝑣𝑟)
+Implementation is in Python with the following dependency:
+```
+python3 -m pip install python-mbedtls
+```
+
+## Building and Running
+
+### NXP Board
+The project for the NXP board consists of two components, one for Normal world (non-secure) and one for Secure world. To build binaries:
+
+1. Normal world binary:
+   - Open the freertos_blinky_ns project
+   - Click 'build' button in Quickstart panel or select 'Project' > 'Build Project'
+   - Click 'LS' next to 'Debug your project' in Quickstart panel, then 'attach to a running target using LinkServer'
+
+2. Secure world binary:
+   - Open the freertos_blinky_s project
+   - Click 'build' button in Quickstart panel or select 'Project' > 'Build Project'
+   - Click 'Debug' on 'Debug your project' in Quickstart panel
+   - If SWD Configuration pops up, select 'Device 0' and click 'OK'
+   - The device will stop at the first line of main function for debugging; execute code by clicking 'Step Into' (F5), 'Step Over' (F6), or 'Resume' (F8)
+
+**Important Notes:**
+- Ensure the NXP board is properly connected to your development machine
+- Verify that the NXP board is correctly wired to the ESP and UWB boards with the following connections:
+  - NXP to ESP32-C3:
+    - D15 on NXP → Pin 7 on ESP32-C3
+    - D14 on NXP → Pin 6 on ESP32-C3
+  - NXP to nRF (UWB board):
+    - D0 on NXP → P0.06 on nRF
+    - D1 on NXP → P0.08 on nRF
+- The ESP board should be powered and running with the proper firmware
+- The manufacturer server should be running before testing the full system
+
+### UWB Boards
+- IDE: [Segger Embedded Studio 8.22a](https://www.segger.com/products/development-tools/embedded-studio/)
+- Project locations:
+  - IoT device: `/IoT_uwb/Drivers/API/Build_Platforms/nRF52840-DK/IoT_Uwb.emProject`
+  - User device: `/user_uwb/Drivers/API/Build_Platforms/nRF52840-DK/user_uwb.emProject`
+
+### ESP32-C3 Boards
+Using VSCode with the Espressif IDF extension:
+1. Open the Command Palette (Ctrl+Shift+P)
+2. Select 'ESP-IDF: Select port to use'
+   - Choose the port for the ESP Board (typically /dev/ttyUSB* in Ubuntu)
+   - Select the directory containing the ESP source code
+3. Select 'ESP-IDF: Set Espressif Device Target'
+   - Choose the ESP source code directory
+   - Select 'esp32c3'
+   - Select 'ESP32-C3 chip (via ESP-PROG)'
+4. Use 'ESP-IDF: SDK Configuration editor (menuconfig)' to confirm UART settings
+   - Port number: 1
+   - Communication speed: 115200
+   - RXD pin: 7
+   - TXD pin: 6
+5. Run 'ESP-IDF: Build your project'
+6. Run 'ESP-IDF: Flash your project'
+
+### Manufacturer Server
+To run the manufacturer server:
+```
+python3 2_ManufacturerServer/ttp_time_srv.py
+```
+
+If you encounter a "address already in use" error, check if the software is already running or change the port number in the file.
+
+## Tamarin Security Models
+
+The security protocol of LOCO has been formally verified using the [Tamarin Prover](https://tamarin-prover.github.io/). The formal models are available in the `tamarin` folder:
+
+```
+tamarin/
+├── key_exchange.spthy    # Model for key exchange protocol
+└── message_announcement.spthy  # Model for secure message announcement
+```
+
+These models can be verified using the Tamarin Prover to ensure the security properties of the LOCO protocols.# LOCO: Secure Localization and Awareness of Ambient IoT Devices
