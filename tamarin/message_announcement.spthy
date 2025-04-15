@@ -47,11 +47,11 @@ lemma message_authentication:
     "All Idev Udev m #i.
       (Recv(Udev, m) @i & Authentic(Idev, m) @i)
       ==> (Ex #j. Send(Idev, m) @j & j < i)
-          | (Ex Idev #r. Reveal(Idev) @r & r < i)"
+          | (Ex Idev #k. Reveal(Idev) @k & k < i)"
 
 lemma unforgeability:
     "All Idev Udev m sig #i.
-    Recv(Udev, m) @i & Verified(Udev, m, sig, pk(Idev)) @i & Honest(Idev) @i
+    (Recv(Udev, m) @i & Verified(Udev, m, sig, pk(Idev)) @i & Honest(Udev) @i &Honest(Idev) @ i)
     ==> (Ex #j. Send(Idev, m) @j & j < i)"
 
 end
