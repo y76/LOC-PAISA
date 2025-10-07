@@ -1,22 +1,11 @@
 /*! ----------------------------------------------------------------------------
  *  @file    ds_twr_sts_sdc_initator.c
  *  @brief   Double-sided two-way ranging (DS TWR) STS with SDC (STS-SDC) initiator example code
- *
- *           This is a simple code example which acts as the initiator in a DS TWR with STS-SDC distance measurement exchange. This application sends a "poll"
- *           frame (recording the TX time-stamp of the poll), and then waits for a "response" message expected from the "DS TWR responder STS-SDC" example
- *           code (companion to this application). When the response is received its RX time-stamp is recorded and we send a "final" message to
- *           complete the exchange. The final message contains all the time-stamps recorded by this application, including the calculated/predicted TX
- *           time-stamp for the final message itself. The companion "DS TWR responder STS-SDC" example application works out the time-of-flight over-the-air
- *           and, thus, the estimated distance between the two devices.
- *
- *           Note: As STS is used, the receptions are considered valid if and only if the STS quality index is good. Then the STS timestamp
- *           is read and used for the TWR range calculation. Please see note below on Super Deterministic Code (SDC).
+ *           MODIFIED TO CALCULATE DISTANCE, PDOA, AND MEASURE EXCHANGE TIME ON INITIATOR SIDE
  *
  * @author Decawave
- *
  * @copyright SPDX-FileCopyrightText: Copyright (c) 2024 Qorvo US, Inc.
  *            SPDX-License-Identifier: LicenseRef-QORVO-2
- *
  */
 
 #include "deca_probe_interface.h"
@@ -34,6 +23,9 @@ extern void test_run_info(unsigned char *data);
 
 /* Example application name and version to display on LCD screen. */
 #define APP_NAME "DSTWR IN STS-SDC v1.0"
+
+/* Define PI for PDOA calculations */
+#define PI 3.14159265358979f
 
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 1000
@@ -54,41 +46,45 @@ static dwt_config_t config = {
     DWT_STS_LEN_64,                    /* STS length see allowed values in Enum dwt_sts_lengths_e */
     DWT_PDOA_M0                        /* PDOA mode off */
 };
+
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
 #define TX_ANT_DLY 16385
 #define RX_ANT_DLY 16385
 
 /* Frames used in the ranging process. See NOTE 2 below. */
 static uint8_t tx_poll_msg[] = { 0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x21 };
-static uint8_t rx_resp_msg[] = { 0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0x10, 0x02, 0, 0 };
+/* MODIFIED: Response message now includes responder timestamps (8 extra bytes) */
+static uint8_t rx_resp_msg[] = { 0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0x10, 0x02, 0, 0, 0, 0, 0, 0, 0, 0 };
 static uint8_t tx_final_msg[] = { 0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
 /* Length of the common part of the message (up to and including the function code, see NOTE 2 below). */
 #define ALL_MSG_COMMON_LEN 10
+
 /* Indexes to access some of the fields in the frames defined above. */
 #define ALL_MSG_SN_IDX            2
+#define RESP_MSG_POLL_RX_TS_IDX   10
+#define RESP_MSG_RESP_TX_TS_IDX   14
 #define FINAL_MSG_POLL_TX_TS_IDX  10
 #define FINAL_MSG_RESP_RX_TS_IDX  14
 #define FINAL_MSG_FINAL_TX_TS_IDX 18
+
 /* Frame sequence number, incremented after each transmission. */
 static uint8_t frame_seq_nb = 0;
 
-/* Buffer to store received response message.
- * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 20
+/* Buffer to store received response message. */
+#define RX_BUF_LEN 24
 static uint8_t rx_buffer[RX_BUF_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
 static uint32_t status_reg = 0;
 
 /* Delay between frames, in UWB microseconds. See NOTE 4 below. */
-/* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW3000's wait for response feature. */
 #define POLL_TX_TO_RESP_RX_DLY_UUS (290 + CPU_PROCESSING_TIME)
-
-/* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW IC's delayed TX function.
- * This value is required to be larger than POLL_TX_TO_RESP_RX_DLY_UUS. Please see NOTE 14 for more details. */
 #define RESP_RX_TO_FINAL_TX_DLY_UUS (480 + CPU_PROCESSING_TIME)
+
 /* Receive response timeout. See NOTE 5 below. */
 #define RESP_RX_TIMEOUT_UUS 300
+
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
 #define PRE_TIMEOUT 5
 
@@ -97,9 +93,44 @@ static uint64_t poll_tx_ts;
 static uint64_t resp_rx_ts;
 static uint64_t final_tx_ts;
 
+/* Hold copies of computed time of flight and distance here for reference. */
+static double tof;
+static double distance;
+
+/* Add PDOA-related variables */
+static char dist_pdoa_str[80]; /* Buffer for combined distance and PDOA output */
+static int16_t pdoa_val = 0;
+static float pdoa_degrees = 0;
+
+/* Add timing measurement variables */
+static uint64_t exchange_start_dtu = 0;  /* Device Time Units */
+static uint64_t exchange_end_dtu = 0;
+static double exchange_duration_ms = 0;
+
 /* Values for the PG_DELAY and TX_POWER registers reflect the bandwidth and power of the spectrum at the current
  * temperature. These values can be calibrated prior to taking reference measurements. See NOTE 7 below. */
 extern dwt_txconfig_t txconfig_options;
+
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_ts_from_resp_msg()
+ *
+ * @brief Read a given timestamp value from the response message. In this function we read the first 4 bytes only as
+ *        we are only using 32-bit timestamps for the responder's timestamps (they wrap around but that's OK).
+ *
+ * @param  ts_field  pointer to the first byte of the timestamp field to get
+ * @param  ts  timestamp value
+ *
+ * @return none
+ */
+static void get_ts_from_resp_msg(uint8_t *ts_field, uint32_t *ts)
+{
+    int i;
+    *ts = 0;
+    for (i = 0; i < 4; i++)
+    {
+        *ts += ((uint32_t)ts_field[i] << (i * 8));
+    }
+}
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn ds_twr_sts_sdc_initiator()
@@ -121,7 +152,7 @@ int ds_twr_sts_sdc_initiator(void)
     /* Reset DW IC */
     reset_DWIC(); /* Target specific drive of RSTn line into DW IC low for a period. */
 
-    Sleep(2); // Time needed for DW3000 to start up (transition from INIT_RC to IDLE_RC
+    Sleep(2); /* Time needed for DW3000 to start up (transition from INIT_RC to IDLE_RC) */
 
     /* Probe for the correct device driver. */
     dwt_probe((struct dwt_probe_s *)&dw3000_probe_interf);
@@ -135,12 +166,14 @@ int ds_twr_sts_sdc_initiator(void)
     }
 
     /* Configure DW IC. See NOTE 13 below. */
-    /* if the dwt_configure returns DWT_ERROR either the PLL or RX calibration has failed the host should reset the device */
     if (dwt_configure(&config))
     {
         test_run_info((unsigned char *)"CONFIG FAILED     ");
         while (1) { };
     }
+
+    /* Enable PDOA mode 3 for phase difference measurement */
+    dwt_setpdoamode(DWT_PDOA_M3);
 
     /* Configure the TX spectrum parameters (power, PG delay and PG count). */
     dwt_configuretxrf(&txconfig_options);
@@ -149,8 +182,7 @@ int ds_twr_sts_sdc_initiator(void)
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);
 
-    /* Set expected response's delay and timeout. See NOTE 4, 5 and 6 below.
-     * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
+    /* Set expected response's delay and timeout. */
     dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
     dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
     dwt_setpreambledetecttimeout(PRE_TIMEOUT);
@@ -161,36 +193,35 @@ int ds_twr_sts_sdc_initiator(void)
     /* Loop forever initiating ranging exchanges. */
     while (1)
     {
-
-        /* Write frame data to DW3000 and prepare transmission. See NOTE 8 below. */
+        /* Write frame data to DW3000 and prepare transmission. */
         tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
         dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);  /* Zero offset in TX buffer. */
         dwt_writetxfctrl(sizeof(tx_poll_msg) + FCS_LEN, 0, 1); /* Zero offset in TX buffer, ranging. */
 
-        // clear all events
+        /* Clear all events */
         dwt_writesysstatuslo(0xFFFFFFFF);
 
-        /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
-         * set by dwt_setrxaftertxdelay() has elapsed. */
+        /* Start transmission, indicating that a response is expected. */
         dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 
-        /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
+        /* Poll for reception of a frame or error/timeout. */
         waitforsysstatus(&status_reg, NULL, (DWT_INT_RXFCG_BIT_MASK | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR), 0);
 
         /* Increment frame sequence number after transmission of the poll message (modulo 256). */
         frame_seq_nb++;
+        
         if (status_reg & DWT_INT_RXFCG_BIT_MASK)
         {
             uint16_t frame_len;
-            int goodSts = 0;    /* Used for checking STS quality in received signal */
-            int16_t stsQual;    /* This will contain STS quality index */
-            uint16_t stsStatus; /* Used to check for good STS status (no errors). */
+            int goodSts = 0;
+            int16_t stsQual;
+            uint16_t stsStatus;
 
             /* Clear good RX frame event and TX frame sent in the DW3000 status register. */
             dwt_writesysstatuslo(DWT_INT_RXFCG_BIT_MASK | DWT_INT_TXFRS_BIT_MASK);
 
-            // As STS is used, we only consider frames that are received with good STS quality
-            if (((goodSts = dwt_readstsquality(&stsQual, 0)) >= 0) && (dwt_readstsstatus(&stsStatus, 0) == DWT_SUCCESS)) // if STS is good this will be true >= 0
+            /* As STS is used, we only consider frames that are received with good STS quality */
+            if (((goodSts = dwt_readstsquality(&stsQual, 0)) >= 0) && (dwt_readstsstatus(&stsStatus, 0) == DWT_SUCCESS))
             {
                 /* A frame has been received, read it into the local buffer. */
                 frame_len = dwt_getframelength(0);
@@ -199,49 +230,82 @@ int ds_twr_sts_sdc_initiator(void)
                     dwt_readrxdata(rx_buffer, frame_len, 0);
                 }
 
-                /* Check that the frame is the expected response from the companion "DS TWR STS-SDC responder" example.
-                 * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+                /* Check that the frame is the expected response. */
                 rx_buffer[ALL_MSG_SN_IDX] = 0;
                 if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
                 {
                     uint32_t final_tx_time;
+                    uint32_t poll_rx_ts_32, resp_tx_ts_32;
                     int ret;
+                    int32_t rtd_init, rtd_resp;
+                    double tof_dtu;
 
                     /* Retrieve poll transmission and response reception timestamp. */
                     poll_tx_ts = get_tx_timestamp_u64();
                     resp_rx_ts = get_rx_timestamp_u64();
 
-                    /* Compute final message transmission time. See NOTE 10 below. */
+                    /* Use poll TX timestamp as exchange start time */
+                    exchange_start_dtu = poll_tx_ts;
+
+                    /* Extract responder's timestamps from response message */
+                    get_ts_from_resp_msg(&rx_buffer[RESP_MSG_POLL_RX_TS_IDX], &poll_rx_ts_32);
+                    get_ts_from_resp_msg(&rx_buffer[RESP_MSG_RESP_TX_TS_IDX], &resp_tx_ts_32);
+
+                    /* Calculate distance using DS-TWR formula */
+                    /* Compute time of flight and distance. 32-bit subtractions give correct answers even if clock has wrapped. */
+                    rtd_init = (int32_t)(resp_rx_ts - poll_tx_ts);
+                    rtd_resp = (int32_t)(resp_tx_ts_32 - poll_rx_ts_32);
+                    tof_dtu = ((double)rtd_init - (double)rtd_resp) / 2.0;
+                    tof = tof_dtu * DWT_TIME_UNITS;
+                    distance = tof * SPEED_OF_LIGHT;
+
+                    /* Read PDOA value */
+                    pdoa_val = dwt_readpdoa();
+                    pdoa_degrees = ((float)pdoa_val / (1<<11)) * 180.0f / PI;
+
+                    /* Compute final message transmission time. */
                     final_tx_time = (resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
                     dwt_setdelayedtrxtime(final_tx_time);
 
                     /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
                     final_tx_ts = (((uint64_t)(final_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
 
-                    /* Write all timestamps in the final message. See NOTE 11 below. */
+                    /* Write all timestamps in the final message. */
                     final_msg_set_ts(&tx_final_msg[FINAL_MSG_POLL_TX_TS_IDX], poll_tx_ts);
                     final_msg_set_ts(&tx_final_msg[FINAL_MSG_RESP_RX_TS_IDX], resp_rx_ts);
                     final_msg_set_ts(&tx_final_msg[FINAL_MSG_FINAL_TX_TS_IDX], final_tx_ts);
 
-                    /* Write and send final message. See NOTE 8 below. */
+                    /* Write and send final message. */
                     tx_final_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-                    dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0); /* Zero offset in TX buffer. */
-                    dwt_writetxfctrl(sizeof(tx_final_msg) + FCS_LEN, 0, 1); /* Zero offset in TX buffer, ranging. */
+                    dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0);
+                    dwt_writetxfctrl(sizeof(tx_final_msg) + FCS_LEN, 0, 1);
                     ret = dwt_starttx(DWT_START_TX_DELAYED);
 
-                    /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
                     if (ret == DWT_SUCCESS)
                     {
-                        /* Poll DW3000 until TX frame sent event set. See NOTE 9 below. */
+                        /* Poll DW3000 until TX frame sent event set. */
                         waitforsysstatus(NULL, NULL, DWT_INT_TXFRS_BIT_MASK, 0);
 
                         /* Clear TXFRS event. */
                         dwt_writesysstatuslo(DWT_INT_TXFRS_BIT_MASK);
 
+                        /* NOW end timing after final message is sent */
+                        exchange_end_dtu = final_tx_ts;
+                        /* Convert device time units to milliseconds */
+                        exchange_duration_ms = (double)(exchange_end_dtu - exchange_start_dtu) * DWT_TIME_UNITS * 1000.0;
+
+                        /* Display combined distance, PDOA, and exchange time */
+                        snprintf(dist_pdoa_str, sizeof(dist_pdoa_str), 
+                                "%.2f m, PDOA:%d (%.1f deg)", 
+                                distance, pdoa_val, pdoa_degrees);
+                        test_run_info((unsigned char *)dist_pdoa_str);
+                        printf("DS-TWR: %3.2f m, PDOA: %d (%3.1f deg), Time: %.2f ms\n", 
+                               distance, pdoa_val, pdoa_degrees, exchange_duration_ms);
+
                         /* Increment frame sequence number after transmission of the final message (modulo 256). */
                         frame_seq_nb++;
                     }
-                } // got good STS
+                }
             }
         }
         else
@@ -255,111 +319,34 @@ int ds_twr_sts_sdc_initiator(void)
     }
 }
 #endif
+
 /*****************************************************************************************************************************************************
- * NOTES:
+ * MODIFICATIONS SUMMARY:
  *
- * Super Deterministic Code (SDC):
- * Since the Ipatov preamble consists of a repeating sequence of the same Ipatov code, the time-of-arrival determined using it is
- * vulnerable to a collision with another packet. If the clock offset between the two packets on the air is low,
- * then the signal from the colliding packet will appear to be just another ray from the desired signal.
- * Depending on when it arrives this can be confused with the first path.
- * The STS uses a continually varying sequence. This means that the colliding packet will not line up with the desired signal.
- * As a result, the TOA will be unaffected.  If security is not a concern, then overhead of key management and counter control
- * is undesirable.  For this reason, the DW3000 includes a special STS mode (SDC) that uses a code optimized for TOA performance.
- * Since it is a time varying sequence optimized for TOA performance it will tolerate packet collisions without requiring any
- * key management.
- * It is important to remember that the SDC mode does not provide security but will increase confidence in the TOA when the
- * on-air packet density is high. For this reason, we would recommend that an SDC based STS is used when security is not a
- * requirement.
+ * 1. DISTANCE CALCULATION ON INITIATOR:
+ *    - Modified response message to include responder timestamps (19 bytes instead of 13)
+ *    - Added function to extract timestamps from response message
+ *    - Calculate distance using DS-TWR formula: TOF = (RTD_init - RTD_resp) / 2
+ *    - Both initiator and responder can now calculate distance independently
  *
- * 1. The sum of the values is the TX to RX antenna delay, experimentally determined by a calibration process. Here we use a hard coded typical value
- *    but, in a real application, each device should have its own antenna delay properly calibrated to get the best possible precision when performing
- *    range measurements.
- * 2. The messages here are similar to those used in the DecaRanging ARM application (shipped with EVK1000 kit). They comply with the IEEE
- *    802.15.4 standard MAC data frame encoding and they are following the ISO/IEC:24730-62:2013 standard. The messages used are:
- *     - a poll message sent by the initiator to trigger the ranging exchange.
- *     - a response message sent by the responder allowing the initiator to go on with the process
- *     - a final message sent by the initiator to complete the exchange and provide all information needed by the responder to compute the
- *       time-of-flight (distance) estimate.
- *    The first 10 bytes of those frame are common and are composed of the following fields:
- *     - byte 0/1: frame control (0x8841 to indicate a data frame using 16-bit addressing).
- *     - byte 2: sequence number, incremented for each new frame.
- *     - byte 3/4: PAN ID (0xDECA).
- *     - byte 5/6: destination address, see NOTE 3 below.
- *     - byte 7/8: source address, see NOTE 3 below.
- *     - byte 9: function code (specific values to indicate which message it is in the ranging process).
- *    The remaining bytes are specific to each message as follows:
- *    Poll message:
- *     - no more data
- *    Response message:
- *     - byte 10: activity code (0x02 to tell the initiator to go on with the ranging exchange).
- *     - byte 11/12: activity parameter, not used here for activity code 0x02.
- *    Final message:
- *     - byte 10 -> 13: poll message transmission timestamp.
- *     - byte 14 -> 17: response message reception timestamp.
- *     - byte 18 -> 21: final message transmission timestamp.
- *    All messages end with a 2-byte checksum automatically set by DW3000.
- * 3. Source and destination addresses are hard coded constants in this example to keep it simple but for a real product every device should have a
- *    unique ID. Here, 16-bit addressing is used to keep the messages as short as possible but, in an actual application, this should be done only
- *    after an exchange of specific messages used to define those short addresses for each device participating to the ranging exchange.
- * 4. Delays between frames have been chosen here to ensure proper synchronisation of transmission and reception of the frames between the initiator
- *    and the responder and to ensure a correct accuracy of the computed distance. The user is referred to DecaRanging ARM Source Code Guide for more
- *    details about the timings involved in the ranging process.
- * 5. This timeout is for complete reception of a frame, i.e. timeout duration must take into account the length of the expected frame. Here the value
- *    is arbitrary but chosen large enough to make sure that there is enough time to receive the complete final frame sent by the responder at the
- *    6.81 Mbps data rate used (around 300 us).
- * 6. The preamble timeout allows the receiver to stop listening in situations where preamble is not starting (which might be because the responder is
- *    out of range or did not receive the message to respond to). This saves the power waste of listening for a message that is not coming. We
- *    recommend a minimum preamble timeout of 5 PACs for short range applications and a larger value (e.g. in the range of 50% to 80% of the preamble
- *    length) for more challenging longer range, NLOS or noisy environments.
- * 7. In a real application, for optimum performance within regulatory limits, it may be necessary to set TX pulse bandwidth and TX power, (using
- *    the dwt_configuretxrf API call) to per device calibrated values saved in the target system or the DW3000 OTP memory.
- * 8. dwt_writetxdata() takes the full size of the message as a parameter but only copies (size - 2) bytes as the check-sum at the end of the frame is
- *    automatically appended by the DW3000. This means that our variable could be two bytes shorter without losing any data (but the sizeof would not
- *    work anymore then as we would still have to indicate the full length of the frame to dwt_writetxdata()).
- * 9. We use polled mode of operation here to keep the example as simple as possible but all status events can be used to generate interrupts. Please
- *    refer to DW3000 User Manual for more details on "interrupts". It is also to be noted that STATUS register is 5 bytes long but, as the event we
- *    use are all in the first bytes of the register, we can use the simple dwt_read32bitreg() API call to access it instead of reading the whole 5
- *    bytes.
- * 10. As we want to send final TX timestamp in the final message, we have to compute it in advance instead of relying on the reading of DW3000
- *     register. Timestamps and delayed transmission time are both expressed in device time units so we just have to add the desired response delay to
- *     response RX timestamp to get final transmission time. The delayed transmission time resolution is 512 device time units which means that the
- *     lower 9 bits of the obtained value must be zeroed. This also allows to encode the 40-bit value in a 32-bit words by shifting the all-zero lower
- *     8 bits.
- * 11. In this operation, the high order byte of each 40-bit timestamps is discarded. This is acceptable as those time-stamps are not separated by
- *     more than 2**32 device time units (which is around 67 ms) which means that the calculation of the round-trip delays (needed in the
- *     time-of-flight computation) can be handled by a 32-bit subtraction.
- * 12. When running this example on the DWK3000 platform with the RESP_RX_TO_FINAL_TX_DLY response delay provided, the dwt_starttx() is always
- *     successful. However, in cases where the delay is too short (or something else interrupts the code flow), then the dwt_starttx() might be issued
- *     too late for the configured start time. The code below provides an example of how to handle this condition: In this case it abandons the
- *     ranging exchange to try another one after 1 second. If this error handling code was not here, a late dwt_starttx() would result in the code
- *     flow getting stuck waiting for a TX frame sent event that will never come. The companion "responder" example (ex_05b) should timeout from
- *     awaiting the "final" and proceed to have its receiver on ready to poll of the following exchange.
- * 13. Desired configuration by user may be different to the current programmed configuratio.n dwt_configure is called to set desired
- *     configuration.
- * 14. The receiver is enabled with reference to the timestamp of the previously received signal.
- *     The receiver will start after a defined delay.
- *     This defined delay is currently the same as the delay between the responder's received
- *     timestamp of it's last received frame and the timestamp of the transmitted signal that is
- *     sent in response.
- *     This means that the initiator needs to reduce it's delay by the configured preamble length.
- *     This allows for the receiver to enable on the initiator at the same time as responder is
- *     transmitting it's message. It should look something like this:
+ * 2. PDOA MEASUREMENT:
+ *    - Added PI constant for angle calculations
+ *    - Added PDOA variables (pdoa_val, pdoa_degrees)
+ *    - Enabled PDOA Mode 3 (dwt_setpdoamode(DWT_PDOA_M3))
+ *    - Read PDOA value after successful reception (dwt_readpdoa())
+ *    - Convert raw PDOA to degrees: degrees = (pdoa_val / 2048) × 180 / π
  *
- *     Initiator: |Poll TX| ..... |Resp RX| ........ |Final TX|
- *     Responder: |Poll RX| ..... |Resp TX| ........ |Final RX|
- *                    ^|P RMARKER|                                    - time of Poll TX/RX
- *                                    ^|R RMARKER|                    - time of Resp TX/RX
- *                                                       ^|R RMARKER| - time of Final TX/RX
+ * 3. TIMING MEASUREMENT:
+ *    - Added timing variables (exchange_start_time, exchange_end_time, exchange_duration_ms)
+ *    - Start timer before poll transmission
+ *    - Stop timer after distance calculation
+ *    - Display exchange duration with distance and PDOA
  *
- *                        <--TDLY->                                   - POLL_TX_TO_RESP_RX_DLY_UUS (RDLY-RLEN)
- *                                <-RLEN->                            - RESP_RX_TIMEOUT_UUS   (length of poll frame)
- *                     <----RDLY------>                               - POLL_RX_TO_RESP_TX_DLY_UUS (depends on how quickly responder
- *                                                                                                                       can turn around and reply)
+ * EXPECTED OUTPUT:
+ * DS-TWR: 2.35 m, PDOA: 512 (22.5 deg), Time: 8 ms
  *
- *
- *                                         <--T2DLY->                 - RESP_TX_TO_FINAL_RX_DLY_UUS (R2DLY-FLEN)
- *                                                   <-FLEN--->       - FINAL_RX_TIMEOUT_UUS   (length of response frame)
- *                                     <----RDLY--------->            - RESP_RX_TO_FINAL_TX_DLY_UUS (depends on how quickly initiator
- *                                                                                                                       can turn around and reply)
+ * This shows:
+ * - Distance measurement in meters
+ * - PDOA raw value and angle in degrees
+ * - Total exchange time in milliseconds
  ****************************************************************************************************************************************************/
