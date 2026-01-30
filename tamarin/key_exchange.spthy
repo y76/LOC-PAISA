@@ -51,14 +51,14 @@ rule Idev_Receive_Compute_Decrypt:
 
 lemma full_trace_executable:
   exists-trace
-    "Ex Udev Idev params ss ephPk #compU #compI #send #recv.
-     ComputeSharedSecret_Udev(Udev, Idev, ss) @ #compU &
-     EncryptAndSendMessage(Udev, senc(params, ss), ephPk) @ #send &
-     ComputeSharedSecret_Idev(Idev, Udev, ss) @ #compI & 
-     DecryptMessage(Idev, params) @ #recv &
-     #recv < compI &
-     #compU < #send & 
-     #send < #recv"
+    "Ex Udev Idev sts_params ss ephPk_Udev #compute_shared_Udev #compute_shared_Idev #send #reception.
+     ComputeSharedSecret_Udev(Udev, Idev, ss) @ #compute_shared_Udev &
+     EncryptAndSendMessage(Udev, senc(sts_params, ss), ephPk_Udev) @ #send &
+     ComputeSharedSecret_Idev(Idev, Udev, ss) @ #compute_shared_Idev & 
+     DecryptMessage(Idev, sts_params) @ #reception &
+     #reception < #compute_shared_Idev &
+     #compute_shared_Udev < #send & 
+     #send < #reception"
 
 lemma sts_params_confidentiality:
   all-traces

@@ -17,7 +17,7 @@ rule Register_pk:
   ]
 
 rule Idev_message_announcement:
-  let m = < $Idev, devmanifest, ~nonce >
+  let m = <$Idev, devmanifest, ~nonce>
   in
   [ Fr(~nonce)
   , Fr(devmanifest)
@@ -42,7 +42,7 @@ rule Udev_receive_message_announcement:
   [ ]
 
 lemma executable:
-  exists-trace 
+  exists-trace
    "Ex Idev Udev m #i #j. Send(Idev,m)@i & Recv(Udev,m)@j"
 
 lemma message_authentication:
