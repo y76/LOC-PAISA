@@ -3,55 +3,73 @@ begin
 
 builtins: signing
 
+restriction Equality:
+  "All x y #i. Eq(x,y) @i ==> x = y"
+
+restriction UniqueNonce:
+  "All n #i #j. UseNonce(n)@i & UseNonce(n)@j ==> #i = #j"
+
 rule Register_pk:
   [ Fr(~ltk_Idev) ]
   -->
   [ !Ltk($Idev, ~ltk_Idev)
   , !Pk($Idev, pk(~ltk_Idev))
-  ] 
-
-rule Reveal_ltk:
-  [ !Ltk(Idev, ltk_Idev) ] --[ Reveal(Idev) ]-> [ Out(ltk_Idev) ]
+  ]
 
 rule Idev_message_announcement:
-  let m = <Idev, devmanifest, ~nonce> 
-  in 
+  let m = <$Idev, devmanifest, ~nonce>
+  in
   [ Fr(~nonce)
   , Fr(devmanifest)
-  , !Ltk(Idev, ltk_Idev)
+  , !Ltk($Idev, ltk_Idev)
   ]
---[ Send(Idev, m) 
-  ]->
+  --[ Send($Idev, m) ]->
   [ Out(<m, sign(m, ltk_Idev), pk(ltk_Idev)>) ]
 
 rule Udev_receive_message_announcement:
-  [ 
-    !Pk(Idev, pk_Idev)
-  , In(<m, sig>)
+  let m = <$Idev, devmanifest, nonce> in
+  [ !Pk($Idev, pk_Idev)
+  , In(<m, sig, pk_Idev>)
   ]
---[ Recv($Udev, m)
-  , Eq(verify(sig, m, pk_Idev), true) 
-  , Authentic(Idev, m), Honest($Udev), Honest(Idev)
-  , Verified($Udev, m, sig, pk_Idev)
-  ]->
+  --[ Recv($Udev, m)
+    , UseNonce(nonce) 
+    , Eq(verify(sig, m, pk_Idev), true)
+    , Authentic($Idev, m)
+    , Honest($Udev)
+    , Honest($Idev)
+    , Verified($Udev, m, sig, pk_Idev)
+    ]->
   [ ]
-
-restriction Equality:
-  "All x y #i. Eq(x,y) @i ==> x = y"
 
 lemma executable:
   exists-trace
-    "Ex Idev Udev m #i #j. Send(Idev,m)@i & Recv(Udev,m) @j"
+   "Ex Idev Udev m #i #j. Send(Idev,m)@i & Recv(Udev,m)@j"
 
 lemma message_authentication:
-    "All Idev Udev m #i.
-      (Recv(Udev, m) @i & Authentic(Idev, m) @i)
-      ==> (Ex #j. Send(Idev, m) @j & j < i)
-          | (Ex Idev #k. Reveal(Idev) @k & k < i)"
+  all-traces
+  "All Idev Udev m #i.
+     (Recv(Udev, m) @i & Authentic(Idev, m) @i)
+     ==> (Ex #j. Send(Idev, m) @j & j < i)"
 
 lemma unforgeability:
-    "All Idev Udev m sig #i.
-    (Recv(Udev, m) @i & Verified(Udev, m, sig, pk(Idev)) @i & Honest(Udev) @i &Honest(Idev) @ i)
-    ==> (Ex #j. Send(Idev, m) @j & j < i)"
+  all-traces
+  "All Idev Udev m sig #i.
+     (Recv(Udev, m) @i & Verified(Udev, m, sig, pk(Idev)) @i &
+      Honest(Idev) @i & Honest(Udev) @i)
+     ==> (Ex #j. Send(Idev, m) @j & j < i)"
 
+lemma no_replay:
+  all-traces
+  "All Udev m #i #j. (Recv(Udev, m) @i & Recv(Udev, m) @j) ==> #i = #j"
+
+lemma message_auth_injective:
+  all-traces
+  "All Udev msg #i. 
+    Recv(Udev, msg) @i 
+    ==>
+    (Ex Idev #j. 
+      Send(Idev, msg) @j & j < i            
+      & not (Ex Udev2 #k.                  
+              Recv(Udev2, msg) @k & not(#k = #i))
+    )"
 end

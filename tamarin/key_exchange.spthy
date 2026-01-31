@@ -1,72 +1,67 @@
 theory key_exchange
 begin
 
-builtins: diffie-hellman, symmetric-encryption, signing
-
-equations: 
-  sdec(senc(m, k), k) = m
+builtins: diffie-hellman, symmetric-encryption
 
 // here we start with the knowledge of Idev's pk from Message Announcement
 rule Register_pk:
   [ Fr(~ltk_Idev) ]
   -->
   [ !Ltk($Idev, ~ltk_Idev)
-    , !Pk($Idev, 'g'^~ltk_Idev)
-    , Out('g'^~ltk_Idev)
+  , !Pk($Idev, 'g'^~ltk_Idev) 
   ]
 
 rule Udev_Generate_Ephemeral_Key_Pair:
   [ Fr(~ephSk_Udev) ]
   --[ GenerateEphemeralKeyPair($Udev) ]->
-  [ !EphemeralPrivateKey($Udev, ~ephSk_Udev),
-    !EphemeralPublicKey($Udev, 'g'^~ephSk_Udev),
-    Out('g'^~ephSk_Udev) ]
+  [ !EphemeralPrivateKey($Udev, ~ephSk_Udev)
+  , !EphemeralPublicKey($Udev, 'g'^~ephSk_Udev)
+  ]
 
 rule Udev_Compute_Shared_Secret:
-    let ss = ('g'^ltk_Idev)^ephSk_Udev
-    in
-  [ !EphemeralPrivateKey($Udev, ephSk_Udev),
-    In('g'^ltk_Idev) ] 
-  --[ ComputeSharedSecret($Udev, $Idev) ]->
+  let ss = pk_Idev^~ephSk_Udev 
+  in
+  [ !EphemeralPrivateKey($Udev, ~ephSk_Udev)
+  , !Pk($Idev, pk_Idev) 
+  ] 
+  --[ ComputeSharedSecret_Udev($Udev, $Idev, ss) ]->
   [ !SharedSecret($Udev, $Idev, ss) ]
 
-rule Idev_Compute_Shared_Secret:
-    let ss = ('g'^ephSk_Udev)^ltk_Idev
-    in
-  [ !Ltk($Idev, ltk_Idev),
-    In('g'^ephSk_Udev) ] 
-  --[ ComputeSharedSecret($Idev, $Udev) ]->
-  [ !SharedSecret($Idev, $Udev, ss) ]
-
 rule Udev_Encrypt_And_Send_Message:
-  [ !SharedSecret($Udev, $Idev, ss),
-    Fr(~sts_params),
-    !EphemeralPublicKey($Udev, 'g'^ephSk_Udev) ]
-  --[ EncryptAndSendMessage($Udev, senc(~sts_params, ss), 'g'^ephSk_Udev), Secret(~sts_params) ]->
-  [ Out(<senc(~sts_params, ss), 'g'^ephSk_Udev>) ]
+  let ephPk_Udev = 'g'^~ephSk_Udev
+      msg = senc(~sts_params, ss)
+  in
+  [ !SharedSecret($Udev, $Idev, ss)
+  , Fr(~sts_params)
+  , !EphemeralPrivateKey($Udev, ~ephSk_Udev)
+  ]
+  --[ Secret(~sts_params), EncryptAndSendMessage($Udev, msg, ephPk_Udev) ]->
+  [ Out(<msg, ephPk_Udev>) ]
 
-rule Idev_Decrypt_Encrypted_Key:
-  [ !SharedSecret($Udev, $Idev, ss),
-    !SharedSecret($Idev, $Udev, ss),
-    In(<senc(sts_key, ss), 'g'^ephSk_Udev>) ] 
-  --[ DecryptEncryptedKey($Idev, sts_key) ]->
-  [ DecryptedMessage(sdec(sts_key,ss)) ]
+rule Idev_Receive_Compute_Decrypt:
+  let ss = ephPk_Udev^~ltk_Idev
+      sts_params = sdec(msg, ss)
+  in
+  [ !Ltk($Idev, ~ltk_Idev)
+  , In(<msg, ephPk_Udev>) 
+  ] 
+  --[ ComputeSharedSecret_Idev($Idev, $Udev, ss), DecryptMessage($Idev, sts_params) ]->
+  [ DecryptedMessage(sts_params) ]
+
 
 lemma full_trace_executable:
   exists-trace
-    "Ex Udev Idev sts_params ss ephPk_Udev #encrypt #compute_shared_u #compute_shared_i #decrypt.
-
-     EncryptAndSendMessage(Udev, senc(sts_params, ss), ephPk_Udev) @ #encrypt &
-     ComputeSharedSecret(Udev, Idev) @ #compute_shared_u &
-     ComputeSharedSecret(Idev, Udev) @ #compute_shared_i &
-     DecryptEncryptedKey(Idev, sts_params) @ #decrypt &
-     
-     // ordering
-     #encrypt < #compute_shared_u &
-     #compute_shared_u < #compute_shared_i &
-     #compute_shared_i < #decrypt"
+    "Ex Udev Idev sts_params ss ephPk_Udev #compute_shared_Udev #compute_shared_Idev #send #reception.
+     ComputeSharedSecret_Udev(Udev, Idev, ss) @ #compute_shared_Udev &
+     EncryptAndSendMessage(Udev, senc(sts_params, ss), ephPk_Udev) @ #send &
+     ComputeSharedSecret_Idev(Idev, Udev, ss) @ #compute_shared_Idev & 
+     DecryptMessage(Idev, sts_params) @ #reception &
+     #reception < #compute_shared_Idev &
+     #compute_shared_Udev < #send & 
+     #send < #reception"
 
 lemma sts_params_confidentiality:
+  all-traces
   "All sts_params #i #j. Secret(sts_params) @ #i & K(sts_params) @ #j ==> F"
 
 end
